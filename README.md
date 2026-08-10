@@ -23,13 +23,15 @@ NEXUS aims to answer four fundamental questions for every automated action:
 3. **WHAT** is it actually doing?
 4. **SHOULD** that action be allowed?
 
-### 6. Key Features (Planned)
-- **NHI Management**: Discovery, inventory, and lifecycle management of non-human identities.
-- **AI Agent Security**: Dedicated registry and monitoring for autonomous AI actors.
-- **Risk Engine**: Dynamic risk scoring based on permissions and behavior.
-- **Policy Engine**: Centralized ruleset for evaluating and enforcing access decisions.
-- **Behavioral Monitoring**: Continuous observation of NHI activities to detect anomalies.
-- **Alerting and Audit**: Comprehensive logging and real-time security alerts.
+### 6. Key Features & Status
+- **NHI Management** *(UI Implemented, Mock Integrated)*: Inventory, search, filtering, and detail view of non-human identities (API keys, service accounts, Cloud IAM, CI/CD).
+- **AI Agent Security** *(UI Implemented, Mock Integrated)*: Dedicated registry to monitor autonomous AI agents, their base LLMs, execution modes, and allowed tools.
+- **Risk Engine** *(UI Implemented, Mock Integrated)*: Dynamic risk scoring dashboard showcasing security posture metrics and trend charts (built with Recharts).
+- **Policy Engine** *(UI Implemented, Mock Integrated)*: Centralized interface displaying governance policies and active enforcement actions (ALLOW, BLOCK, REVIEW, ALERT).
+- **Access Graph** *(UI Implemented, Mock Integrated)*: Visual map representation tracking relationships between identities, agents, and target resources.
+- **Command Center & Crawler Simulator** *(UI Implemented, Mock Integrated)*: Operations console to run discovery scans, trigger audit events, and observe real-time telemetry simulator.
+- **Alerting & Auditing** *(UI Implemented, Mock Integrated)*: Security incident feeds showing alert severity (Critical, High, Medium, Low) and comprehensive, immutable audit trail logs.
+- **Behavioral Monitoring** *(Planned)*: Continuous observation of NHI activities to detect anomalous operations.
 
 ### 7. NHI Management
 Discovers and tracks API keys, service accounts, Cloud IAM roles, CI/CD identities, and more, maintaining a detailed inventory of permissions and usage.
@@ -75,8 +77,12 @@ NEXUS uses a modular, decoupled architecture separating the frontend UI, backend
 See [docs/roadmap.md](docs/roadmap.md) for the detailed phased development approach.
 
 ### 18. Project Structure
-- `/docs`: Technical documentation and architecture specifications.
-- *(More directories will be added as application development begins)*
+- `/app`: Next.js routing, layout structure, global styles, and page controllers (Dashboard, NHI, AI Agents, Policies, Alerts, Audit logs, Command Center, Access Graph, Auth).
+- `/components`: Component-driven architecture including global layout elements (`Sidebar`, `TopBar`), dashboard components (`KPICard`), and generic UI elements (`RiskGauge`, `RiskTrendChart`, badges, feeds).
+- `/context`: Global React contexts (`AuthContext` with mock support/Supabase client hooks, `NavigationContext`).
+- `/docs`: Foundational architecture specifications, threat models, project statements, and roadmaps.
+- `/lib`: Supabase initialization wrappers, mock datasets (`/lib/mock`), service endpoints (`/lib/services`), and common utilities.
+- `/types`: TypeScript interface definitions.
 
 ### 19. Security Principles
 - Secure by default
@@ -86,12 +92,16 @@ See [docs/roadmap.md](docs/roadmap.md) for the detailed phased development appro
 
 ### 20. Future Enhancements
 - Advanced ML-based anomaly detection (Isolation Forests).
-- Deep integrations with additional cloud providers.
-- Graph-based access visualization.
+- Deep API integrations with GitHub, AWS, and Kubernetes.
+- Interactive d3/graph layouts for the Access Graph dashboard.
 
 ### 21. Development Status
-**Current Phase: Documentation**
-The project is currently in the foundational documentation and planning phase. No production infrastructure or application code is active yet.
+**Current Phase: Phase 1 (Project Foundation) - Frontend Complete, Database-Ready**
+The NEXUS frontend platform has been scaffolded and fully built using **Next.js 16.3 (TypeScript)** and **Tailwind CSS v4**. 
+- A custom UI design system was developed, featuring dark-mode layouts, responsive navigation, metric dashboards, and audit visualizers.
+- A client-side services layer and mock database engine were created to simulate operations, scan triggers, security alerts, and policies.
+- Authentication pages (login, signup, password resets) are integrated with **Supabase Auth** client contexts, ready for backend deployment.
+The next step is backend engineering (FastAPI) and connecting active database tables to replace mock datasets.
 
 ### 22. License
 [MIT License](LICENSE) *(Placeholder)*

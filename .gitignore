@@ -67,3 +67,10 @@ logs/
 # Temp files
 tmp/
 temp/
+
+#SUPABASE_SERVICE_ROLE_KEY
+#AWS_SECRET_ACCESS_KEY
+#AWS_SESSION_TOKEN
+#API keys
+#passwords
+#tokens

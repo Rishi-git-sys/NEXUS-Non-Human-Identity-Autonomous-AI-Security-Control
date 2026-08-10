@@ -11,10 +11,10 @@ export function RiskGauge({ score }: { score: number }) {
   const medium = score - critical - high;
 
   const data = [
-    { name: 'Critical', value: critical, color: '#ff6b6b' },
-    { name: 'High', value: high, color: '#f2a623' },
-    { name: 'Medium', value: medium, color: '#9a9da3' },
-    { name: 'Healthy', value: healthy, color: '#5bd48f' },
+    { name: 'Critical', value: critical, color: 'var(--critical-text)' },
+    { name: 'High', value: high, color: 'var(--warning-text)' },
+    { name: 'Medium', value: medium, color: 'var(--info-text)' },
+    { name: 'Healthy', value: healthy, color: 'var(--healthy-text)' },
   ].filter(d => d.value > 0);
 
   return (
@@ -41,7 +41,7 @@ export function RiskGauge({ score }: { score: number }) {
       </ResponsiveContainer>
       <div className="absolute flex flex-col items-center justify-center bottom-4">
         <span className={`text-4xl font-bold ${getRiskColor(score)}`}>{score}</span>
-        <span className="text-xs text-[#9a9da3] mt-1 font-medium">/ 100</span>
+        <span className="text-xs text-secondary mt-1 font-semibold">/ 100</span>
       </div>
     </div>
   );

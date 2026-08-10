@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Space_Grotesk, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/layout/Sidebar";
-import TopBar from "@/components/layout/TopBar";
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+});
+
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
+  subsets: ["latin"],
+});
+
+const ibmPlexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -14,21 +23,31 @@ export const metadata: Metadata = {
   description: "Enterprise non-human identity and AI agent security posture",
 };
 
+import { NavigationProvider } from "@/context/NavigationContext";
+import { AuthProvider } from "@/context/AuthContext";
+import { ThemeProvider } from "@/context/ThemeContext";
+import { ToastProvider } from "@/context/ToastContext";
+import RootLayoutWrapper from "@/components/layout/RootLayoutWrapper";
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} antialiased h-full`}>
-      <body className="bg-[var(--color-background)] text-[var(--color-primary-text)] h-full flex text-sm overflow-hidden">
-        <Sidebar />
-        <div className="flex flex-col flex-1 h-full overflow-hidden">
-          <TopBar />
-          <main className="flex-1 overflow-y-auto bg-[var(--color-background)]">
-            {children}
-          </main>
-        </div>
+    <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable} antialiased h-full`}>
+      <body className="bg-background text-primary-text h-full flex text-sm overflow-hidden">
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <NavigationProvider>
+                <RootLayoutWrapper>
+                  {children}
+                </RootLayoutWrapper>
+              </NavigationProvider>
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
