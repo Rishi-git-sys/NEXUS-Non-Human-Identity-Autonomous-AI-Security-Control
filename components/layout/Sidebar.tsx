@@ -209,6 +209,7 @@ export default function Sidebar() {
         <div className="flex items-center justify-between gap-2.5">
           <div className="flex items-center gap-2 min-w-0">
             {user?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img 
                 src={user.avatar_url} 
                 alt={user.full_name || 'Operator'} 

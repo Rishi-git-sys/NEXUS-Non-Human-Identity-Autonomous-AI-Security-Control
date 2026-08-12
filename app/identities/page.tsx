@@ -20,7 +20,8 @@ import {
   Loader2, 
   RefreshCw, 
   AlertCircle,
-  X
+  X,
+  Cloud
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatTimestamp } from '@/lib/utils';
@@ -49,6 +50,9 @@ export default function IdentitiesPage() {
   const [newIdentityProvider, setNewIdentityProvider] = useState('AWS');
   const [newIdentityOwner, setNewIdentityOwner] = useState('SecOps Team');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // AWS Sync State
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchIdentities = useCallback(async (isRefresh = false) => {
     if (!user?.organization_id) {
@@ -140,6 +144,47 @@ export default function IdentitiesPage() {
     }
   };
 
+  const handleSyncAWS = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await fetch('/api/integrations/aws/sync', { method: 'POST' });
+      const data = await res.json();
+      
+      if (res.ok && data.success) {
+        const sync = data.summary?.sync || data.summary || {};
+        const intel = data.summary?.intelligence || {};
+        const created = sync.identitiesCreated ?? sync.created ?? 0;
+        const updated = sync.identitiesUpdated ?? sync.updated ?? 0;
+        const skipped = sync.skipped ?? 0;
+        const errors = sync.errors ?? 0;
+        const usersDiscovered = sync.usersDiscovered ?? 0;
+        const rolesDiscovered = sync.rolesDiscovered ?? 0;
+        
+        const keys = intel.accessKeysAnalyzed ?? 0;
+        const pols = intel.policiesAnalyzed ?? 0;
+        const high = intel.highRiskIdentities ?? 0;
+        const crit = intel.criticalRiskIdentities ?? 0;
+
+        const msg = `Users: ${usersDiscovered}, Roles: ${rolesDiscovered} | Keys analyzed: ${keys}, Policies analyzed: ${pols} | High: ${high}, Critical: ${crit} | Created: ${created}, Updated: ${updated}, Skipped: ${skipped}`;
+
+        if (errors > 0) {
+          showToast(`AWS Sync completed with ${errors} errors. ${msg}`, 'warning');
+        } else {
+          showToast(`AWS IAM Sync Complete. ${msg}`, 'success');
+        }
+        await fetchIdentities(true);
+      } else {
+        showToast(data.error || 'Failed to sync AWS IAM identities.', 'error');
+      }
+    } catch (err) {
+      console.error('Error syncing AWS IAM:', err);
+      showToast('An error occurred during AWS IAM synchronization.', 'error');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   // Filter identities
   const filteredIdentities = identities
     .filter((id) => {
@@ -205,10 +250,20 @@ export default function IdentitiesPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => fetchIdentities(true)}
-            className="p-2 bg-surface hover:bg-surface-top border border-border text-secondary hover:text-white rounded-[6px] transition-colors cursor-pointer"
+            className="p-2 bg-surface hover:bg-surface-top border border-border text-secondary hover:text-white rounded-[6px] transition-colors cursor-pointer flex items-center justify-center h-9 w-9"
             title="Refresh Identities"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+
+          <button
+            onClick={handleSyncAWS}
+            disabled={isSyncing || isLoading}
+            className="bg-surface hover:bg-surface-top border border-border text-secondary hover:text-white font-semibold text-xs px-3.5 py-2 rounded-[6px] transition-colors flex items-center gap-1.5 cursor-pointer h-9 disabled:opacity-50"
+            title="Sync AWS IAM Identities"
+          >
+            {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+            <span className="hidden sm:inline">Sync AWS IAM</span>
           </button>
 
           <button

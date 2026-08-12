@@ -370,13 +370,35 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
                 Zero critical risk anomalies detected for this identity.
               </p>
             ) : (
-              <ul className="space-y-2">
-                {identity.riskFactors.map((factor, idx) => (
-                  <li key={idx} className="text-xs text-secondary flex items-start gap-2">
-                    <ShieldAlert className="w-4 h-4 text-critical-text shrink-0 mt-0.5" />
-                    <span>{factor}</span>
-                  </li>
-                ))}
+              <ul className="space-y-3">
+                {identity.riskFactors.map((factor, idx) => {
+                  const isString = typeof factor === 'string';
+                  const title = isString ? factor : factor.title;
+                  const description = isString ? null : factor.description;
+                  const severity = isString ? 'HIGH' : factor.severity;
+                  
+                  return (
+                    <li key={idx} className="bg-bg-mid border border-border rounded-[8px] p-3 flex items-start gap-3">
+                      <ShieldAlert className={`w-4 h-4 shrink-0 mt-0.5 ${severity === 'CRITICAL' ? 'text-critical-text' : severity === 'HIGH' ? 'text-warning-text' : severity === 'MEDIUM' ? 'text-purple-400' : 'text-secondary'}`} />
+                      <div className="space-y-1 w-full">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-white">{title}</span>
+                          {!isString && (
+                            <span className={`text-[9px] uppercase font-bold px-1.5 py-0.5 rounded border ${
+                              severity === 'CRITICAL' ? 'bg-critical-bg text-critical-text border-critical-border' :
+                              severity === 'HIGH' ? 'bg-warning-bg text-warning-text border-warning-border' :
+                              severity === 'MEDIUM' ? 'bg-purple-900/30 text-purple-400 border-purple-500/30' :
+                              'bg-surface-top text-secondary border-border'
+                            }`}>
+                              {severity}
+                            </span>
+                          )}
+                        </div>
+                        {description && <p className="text-[11px] text-secondary leading-relaxed">{description}</p>}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -440,8 +462,117 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
       {/* Connected Access & Recent Activity Columns */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* Connected Permissions & Systems */}
-        <div className="bg-surface border border-border rounded-[12px] p-6 lg:col-span-1 space-y-4 hover:border-border/80 transition-colors animate-slide-up">
+        <div className="lg:col-span-1 flex flex-col gap-6">
+          {/* AWS Information Block */}
+          {/* AWS Information Block */}
+          {(() => {
+            const isAWSIAMIdentity = String(identity.provider || '').toLowerCase() === 'aws' && typeof identity.arn === 'string' && identity.arn.startsWith('arn:aws:iam::');
+            if (!isAWSIAMIdentity) return null;
+            return (
+              <div className="bg-surface border border-border rounded-[12px] p-6 space-y-4 hover:border-border/80 transition-colors animate-slide-up">
+                <h3 className="text-xs font-bold text-muted uppercase tracking-wider block">AWS Information</h3>
+                <div className="space-y-3">
+                  <div className="bg-bg-mid p-3 rounded-[6px] border border-border">
+                    <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-1">AWS Identity Type</span>
+                    <span className="font-semibold text-white text-xs">{identity.awsType || (identity.type === 'IAM Role' ? 'IAM Role' : 'IAM User')}</span>
+                  </div>
+                  <div className="bg-bg-mid p-3 rounded-[6px] border border-border">
+                    <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-1">Amazon Resource Name (ARN)</span>
+                    <span className="font-mono text-purple-400 text-[10px] break-all select-all">{identity.arn}</span>
+                  </div>
+                  {identity.awsPath && (
+                    <div className="bg-bg-mid p-3 rounded-[6px] border border-border">
+                      <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-1">Path</span>
+                      <span className="font-mono text-white text-[10px]">{identity.awsPath}</span>
+                    </div>
+                  )}
+                  
+                  {/* Phase 4 AWS Security Intelligence */}
+                  {identity.awsSecurity && (
+                    <div className="mt-4 pt-4 border-t border-border space-y-4">
+                      <h4 className="text-[11px] font-bold text-orange-400 uppercase tracking-wider block">AWS Security Intelligence</h4>
+                      
+                      {/* Credential Security */}
+                      {identity.awsType !== 'IAM Role' && (
+                        <div className="bg-bg-mid border border-border p-3 rounded-[6px]">
+                          <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-2">Credential Security</span>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="flex justify-between items-center text-secondary">
+                              <span>Total Keys:</span>
+                              <span className="text-white font-semibold">{identity.awsSecurity.accessKeys?.length || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-secondary">
+                              <span>Active:</span>
+                              <span className="text-white font-semibold">{identity.awsSecurity.accessKeys?.filter(k => k.status === 'Active').length || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-secondary">
+                              <span>Inactive:</span>
+                              <span className="text-white font-semibold">{identity.awsSecurity.accessKeys?.filter(k => k.status === 'Inactive').length || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center text-secondary">
+                              <span>Oldest (Days):</span>
+                              <span className={identity.awsSecurity.accessKeys?.some(k => k.ageDays > 90) ? 'text-warning-text font-bold' : 'text-white font-semibold'}>
+                                {identity.awsSecurity.accessKeys?.length ? Math.max(...identity.awsSecurity.accessKeys.map(k => k.ageDays)) : 'N/A'}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Permission Security */}
+                      <div className="bg-bg-mid border border-border p-3 rounded-[6px]">
+                        <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-2">Permission Security</span>
+                        <div className="grid grid-cols-1 gap-2 text-xs">
+                          <div className="flex justify-between items-center text-secondary">
+                            <span>Managed Policies:</span>
+                            <span className="text-white font-semibold">{identity.awsSecurity.policies?.filter(p => p.source === 'managed').length || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-secondary">
+                            <span>Inline Policies:</span>
+                            <span className="text-white font-semibold">{identity.awsSecurity.policies?.filter(p => p.source === 'inline').length || 0}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-secondary">
+                            <span>Admin Access:</span>
+                            <span className={identity.awsSecurity.privilegeSummary?.administrator ? 'text-critical-text font-bold' : 'text-white font-semibold'}>
+                              {identity.awsSecurity.privilegeSummary?.administrator ? 'YES' : 'NO'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-secondary">
+                            <span>Wildcard Actions:</span>
+                            <span className={identity.awsSecurity.privilegeSummary?.wildcardActions ? 'text-warning-text font-bold' : 'text-white font-semibold'}>
+                              {identity.awsSecurity.privilegeSummary?.wildcardActions ? 'YES' : 'NO'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-secondary">
+                            <span>Wildcard Resources:</span>
+                            <span className={identity.awsSecurity.privilegeSummary?.wildcardResources ? 'text-warning-text font-bold' : 'text-white font-semibold'}>
+                              {identity.awsSecurity.privilegeSummary?.wildcardResources ? 'YES' : 'NO'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="bg-bg-mid p-3 rounded-[6px] border border-border">
+                      <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-1">Risk Score</span>
+                      <span className="font-bold text-white text-xs">{identity.riskScore}</span>
+                    </div>
+                    <div className="bg-bg-mid p-3 rounded-[6px] border border-border">
+                      <span className="text-[9px] text-muted uppercase font-bold tracking-wider block mb-1">Severity</span>
+                      <span className={`text-xs font-bold ${identity.riskScore >= 75 ? 'text-critical-text' : identity.riskScore >= 50 ? 'text-warning-text' : 'text-purple-400'}`}>
+                        {identity.riskScore >= 75 ? 'CRITICAL' : identity.riskScore >= 50 ? 'HIGH' : identity.riskScore >= 25 ? 'MEDIUM' : 'LOW'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Connected Permissions & Systems */}
+          <div className="bg-surface border border-border rounded-[12px] p-6 space-y-4 hover:border-border/80 transition-colors animate-slide-up">
           <h3 className="text-xs font-bold text-muted uppercase tracking-wider block">Connected Access</h3>
           
           <div className="space-y-4">
@@ -476,6 +607,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
             </div>
 
           </div>
+        </div>
         </div>
 
         {/* Recent Activity Timeline */}

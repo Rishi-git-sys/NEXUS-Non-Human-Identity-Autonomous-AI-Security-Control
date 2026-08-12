@@ -20,7 +20,8 @@ import {
   ShieldAlert,
   AlertCircle,
   RefreshCw,
-  ShieldCheck
+  ShieldCheck,
+  Cloud
 } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/context/ToastContext';
@@ -328,6 +329,54 @@ export default function DashboardPage() {
 
       </div>
 
+      {/* AWS Security Intelligence KPI Row */}
+      {data.hasTelemetry && data.awsIdentities.total > 0 && (
+        <div className="bg-surface border border-border rounded-[12px] p-6 mt-6">
+          <div className="flex justify-between items-center mb-4 border-b border-border pb-3">
+            <h3 className="text-xs font-bold text-muted uppercase tracking-wider flex items-center gap-2">
+              <Cloud className="w-4 h-4 text-orange-400" />
+              <span>AWS Security Intelligence</span>
+            </h3>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 text-center">
+            
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">Identities</span>
+              <span className="text-xl font-bold text-white">{data.awsIdentities.total}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">IAM Users</span>
+              <span className="text-xl font-bold text-white">{data.awsIdentities.iamUsers}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">IAM Roles</span>
+              <span className="text-xl font-bold text-white">{data.awsIdentities.iamRoles}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">Active Keys</span>
+              <span className="text-xl font-bold text-white">{data.awsIdentities.activeAccessKeys || 0}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">Old Keys</span>
+              <span className="text-xl font-bold text-warning-text">{data.awsIdentities.oldAccessKeys || 0}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">Admins</span>
+              <span className="text-xl font-bold text-critical-text">{data.awsIdentities.administratorIdentities || 0}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">High Risk</span>
+              <span className="text-xl font-bold text-warning-text">{data.awsIdentities.highRisk}</span>
+            </div>
+            <div className="p-3 bg-background border border-border rounded-[8px]">
+              <span className="block text-[10px] text-muted font-bold uppercase mb-1">Critical Risk</span>
+              <span className="text-xl font-bold text-critical-text">{data.awsIdentities.criticalRisk}</span>
+            </div>
+
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Posture + Trend */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
@@ -451,6 +500,45 @@ export default function DashboardPage() {
 
       {/* Main Grid: Attention required + AI Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+
+        {/* AWS Identity Intelligence Card */}
+        <div className="bg-surface border border-border rounded-[12px] p-6 lg:col-span-1 space-y-5 hover:border-border/80 transition-colors">
+          <div className="border-b border-border pb-3">
+            <h3 className="text-xs font-bold text-muted uppercase tracking-wider">AWS Identity Intelligence</h3>
+          </div>
+          <div className="space-y-4 text-xs text-secondary">
+            <div className="flex justify-between items-center bg-bg-mid p-3 rounded-[6px] border border-border">
+              <span className="font-semibold text-white">AWS Identities</span>
+              <span className="font-mono text-purple-400 font-bold">{data.awsIdentities.total}</span>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-bg-mid p-3 rounded-[6px] border border-border flex flex-col justify-between">
+                <span className="text-[10px] text-muted uppercase font-bold tracking-wider mb-2">IAM Users</span>
+                <span className="font-mono text-white text-lg font-bold">{data.awsIdentities.iamUsers}</span>
+              </div>
+              <div className="bg-bg-mid p-3 rounded-[6px] border border-border flex flex-col justify-between">
+                <span className="text-[10px] text-muted uppercase font-bold tracking-wider mb-2">IAM Roles</span>
+                <span className="font-mono text-white text-lg font-bold">{data.awsIdentities.iamRoles}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-border">
+              <div className="flex justify-between items-center text-xs">
+                <span>Critical Risk</span>
+                <span className={data.awsIdentities.criticalRisk > 0 ? "text-critical-text font-bold" : "text-white font-semibold"}>
+                  {data.awsIdentities.criticalRisk}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span>High Risk</span>
+                <span className={data.awsIdentities.highRisk > 0 ? "text-warning-text font-bold" : "text-white font-semibold"}>
+                  {data.awsIdentities.highRisk}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
         
         {/* Attention Required Card */}
         <div className="bg-surface border border-border rounded-[12px] p-6 lg:col-span-2 space-y-5 hover:border-border/80 transition-colors">
