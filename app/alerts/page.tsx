@@ -212,10 +212,9 @@ export default function AlertsPage() {
 
                   <div className="bg-background border border-border rounded-[6px] p-2 text-[10px] text-secondary max-w-2xl">
                     <span className="font-bold text-muted uppercase tracking-wider block mb-0.5">RECOMMENDED RESOLUTION ACTION</span>
-                    {alert.severity === 'Critical' 
+                    {alert.recommendation || (alert.severity === 'Critical' 
                       ? 'Immediately restrict actor API key permissions and freeze active execution model workflows.' 
-                      : 'Monitor behavioral metrics closely or execute developer credentials rotation.'
-                    }
+                      : 'Monitor behavioral metrics closely or execute developer credentials rotation.')}
                   </div>
                   
                   <div className="flex flex-wrap gap-4 text-[10px] text-muted">
@@ -223,6 +222,8 @@ export default function AlertsPage() {
                       {alert.agentId ? <Cpu className="w-3.5 h-3.5" /> : <Key className="w-3.5 h-3.5" />}
                       Actor: <span className="font-mono text-secondary">{alert.actor}</span>
                     </span>
+                    {alert.provider && <span>Provider: <span className="text-secondary">{alert.provider}</span></span>}
+                    {alert.arn && <span>ARN: <span className="font-mono text-secondary truncate max-w-[200px]" title={alert.arn}>{alert.arn}</span></span>}
                     <span>Target: <span className="font-mono text-secondary">{alert.resource}</span></span>
                     <span>Detected: {formatTimestamp(alert.timestamp)}</span>
                   </div>
