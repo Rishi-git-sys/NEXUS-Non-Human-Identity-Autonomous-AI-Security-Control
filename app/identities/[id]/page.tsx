@@ -321,6 +321,18 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
+      {identity.riskFactors.some(f => typeof f !== 'string' && f.code === 'AWS_MANAGED_SERVICE_ROLE') && (
+        <div className="bg-purple-900/20 border border-purple-500/30 rounded-[12px] p-4 flex items-start gap-3 animate-slide-up">
+          <Shield className="w-5 h-5 text-purple-400 shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-white text-sm font-bold">AWS Managed Service Role</h3>
+            <p className="text-xs text-secondary mt-1">
+              Broad permissions may be required for the AWS service. NEXUS evaluates these differently from custom identities.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Risk Analysis Card */}
