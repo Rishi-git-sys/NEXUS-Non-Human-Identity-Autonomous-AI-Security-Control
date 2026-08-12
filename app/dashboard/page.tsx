@@ -374,6 +374,32 @@ export default function DashboardPage() {
             </div>
 
           </div>
+
+          <div className="mt-4 pt-4 border-t border-border">
+            <h4 className="text-[10px] font-bold text-muted uppercase tracking-wider mb-3">Least-Privilege Intelligence</h4>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+              <div className="p-3 bg-background border border-border rounded-[8px]">
+                <span className="block text-[10px] text-muted font-bold uppercase mb-1">Wildcard Perms</span>
+                <span className="text-xl font-bold text-warning-text">{data.awsIdentities.wildcardPermissions}</span>
+              </div>
+              <div className="p-3 bg-background border border-border rounded-[8px]">
+                <span className="block text-[10px] text-muted font-bold uppercase mb-1">Admin Access</span>
+                <span className="text-xl font-bold text-critical-text">{data.awsIdentities.administratorAccess}</span>
+              </div>
+              <div className="p-3 bg-background border border-border rounded-[8px]">
+                <span className="block text-[10px] text-muted font-bold uppercase mb-1">PowerUser</span>
+                <span className="text-xl font-bold text-warning-text">{data.awsIdentities.powerUserAccess}</span>
+              </div>
+              <div className="p-3 bg-background border border-border rounded-[8px]">
+                <span className="block text-[10px] text-muted font-bold uppercase mb-1">Dangerous IAM</span>
+                <span className="text-xl font-bold text-critical-text">{data.awsIdentities.dangerousIamPermissions}</span>
+              </div>
+              <div className="p-3 bg-background border border-border rounded-[8px]">
+                <span className="block text-[10px] text-muted font-bold uppercase mb-1">Privilege Review</span>
+                <span className="text-xl font-bold text-purple-400">{data.awsIdentities.leastPrivilegeReview}</span>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

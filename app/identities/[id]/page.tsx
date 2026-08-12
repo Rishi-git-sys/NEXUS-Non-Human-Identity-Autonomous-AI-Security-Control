@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { identityService } from '@/lib/services/identityService';
-import { Identity } from '@/lib/types/identity';
+import { Identity, RiskFactor } from '@/lib/types/identity';
 import { AuditEvent } from '@/lib/types/audit';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
 import { Shield, ShieldAlert, Key, Ban, UserCheck, AlertTriangle, ArrowLeft, Clock, Activity, Lock, Loader2, RefreshCw } from 'lucide-react';
@@ -407,6 +407,12 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
                           )}
                         </div>
                         {description && <p className="text-[11px] text-secondary leading-relaxed">{description}</p>}
+                        {!isString && (factor as { recommendation?: string }).recommendation && (
+                          <div className="mt-2 bg-surface-top border border-border rounded-[6px] p-2">
+                            <span className="text-[9px] font-bold text-purple-400 uppercase tracking-wider block mb-1">Recommendation</span>
+                            <p className="text-[11px] text-secondary leading-relaxed">{(factor as { recommendation?: string }).recommendation}</p>
+                          </div>
+                        )}
                       </div>
                     </li>
                   );
@@ -563,6 +569,26 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
                           </div>
                         </div>
                       </div>
+
+                      {/* Least-Privilege Review */}
+                      {(() => {
+                        const leastPrivFactors = identity.riskFactors.filter(f => typeof f !== 'string' && ['AWS_WILDCARD_RESOURCE', 'AWS_WILDCARD_ACTION', 'AWS_ADMINISTRATOR_POLICY', 'AWS_POWERUSER_POLICY', 'AWS_DANGEROUS_IAM_PERMISSION'].includes((f as RiskFactor).code));
+                        if (leastPrivFactors.length === 0) return null;
+                        return (
+                          <div className="bg-bg-mid border border-border p-3 rounded-[6px]">
+                            <span className="text-[9px] text-purple-400 uppercase font-bold tracking-wider block mb-2">Least-Privilege Review</span>
+                            <ul className="space-y-2">
+                              {leastPrivFactors.map((f, i) => (
+                                <li key={i} className="text-[10px] text-secondary">
+                                  <span className="font-bold text-white block">{(f as RiskFactor).title}</span>
+                                  {(f as RiskFactor).recommendation}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })()}
+
                     </div>
                   )}
 
