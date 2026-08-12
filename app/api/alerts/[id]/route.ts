@@ -41,6 +41,11 @@ export async function PATCH(
       return apiError('Alert status is required.', 400);
     }
 
+    const validStatuses = ['Open', 'Acknowledged', 'Investigating', 'Resolved', 'Dismissed'];
+    if (!validStatuses.includes(body.status)) {
+      return apiError(`Invalid alert status. Must be one of: ${validStatuses.join(', ')}`, 400);
+    }
+
     const res = await alertService.updateAlertStatus(
       organizationId,
       user.id,

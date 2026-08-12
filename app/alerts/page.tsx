@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { alertService } from '@/lib/services/alertService';
 import { Alert } from '@/lib/types/alert';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
-import { Search, Eye, Check, XCircle, Cpu, Key, RefreshCw, AlertCircle } from 'lucide-react';
+import { Search, Eye, Check, XCircle, Cpu, Key, RefreshCw, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatTimestamp } from '@/lib/utils';
 import Link from 'next/link';
 import { useToast } from '@/context/ToastContext';
@@ -21,6 +20,10 @@ export default function AlertsPage() {
   const [search, setSearch] = useState('');
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('active');
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+
+  const limit = 50;
 
   const fetchAlerts = useCallback(async (isRefresh = false) => {
     if (!user?.organization_id) {
@@ -32,21 +35,43 @@ export default function AlertsPage() {
     setError(null);
 
     try {
-      const data = await alertService.getAlerts(user.organization_id);
-      setAlerts(data);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+
+      if (search) params.set('search', search);
+      if (selectedSeverity !== 'all') params.set('severity', selectedSeverity);
+      if (selectedStatus !== 'all') params.set('status', selectedStatus);
+
+      const res = await fetch(`/api/alerts?${params.toString()}`);
+      
+      if (!res.ok) {
+        throw new Error('Failed to fetch alerts');
+      }
+
+      const json = await res.json();
+      
+      if (json.success) {
+        setAlerts(json.data.data);
+        setTotalPages(json.data.pagination.totalPages || 1);
+      } else {
+        throw new Error(json.error || 'Failed to fetch alerts');
+      }
     } catch (err: unknown) {
       console.error('Error fetching alerts from control plane:', err);
       setError('Unable to load security alerts from control plane. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, [user, page, search, selectedSeverity, selectedStatus]);
 
   useEffect(() => {
     if (user?.organization_id) {
-      requestAnimationFrame(() => {
+      const delayDebounceFn = setTimeout(() => {
         fetchAlerts();
-      });
+      }, 300);
+      return () => clearTimeout(delayDebounceFn);
     } else if (!user) {
       requestAnimationFrame(() => {
         setIsLoading(false);
@@ -55,20 +80,22 @@ export default function AlertsPage() {
   }, [user, fetchAlerts]);
 
   const handleUpdateStatus = async (id: string, status: Alert['status']) => {
-    if (!user?.organization_id) return;
-
     try {
-      const res = await alertService.updateAlertStatus(
-        user.organization_id,
-        user.id,
-        id,
-        status
-      );
-      if (res.success) {
+      const res = await fetch(`/api/alerts/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status }),
+      });
+      
+      const json = await res.json();
+      
+      if (res.ok && json.success) {
         showToast(`Alert marked as ${status}.`, 'success');
         await fetchAlerts(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to update alert status.', 'error');
       }
     } catch (err) {
       console.error('Error updating alert status:', err);
@@ -76,23 +103,20 @@ export default function AlertsPage() {
     }
   };
 
-  const filteredAlerts = alerts.filter((alert) => {
-    const matchesSearch = alert.title.toLowerCase().includes(search.toLowerCase()) || 
-                          alert.reason.toLowerCase().includes(search.toLowerCase()) ||
-                          alert.actor.toLowerCase().includes(search.toLowerCase()) ||
-                          alert.resource.toLowerCase().includes(search.toLowerCase());
-    
-    const matchesSeverity = selectedSeverity === 'all' || alert.severity === selectedSeverity;
-    
-    let matchesStatus = true;
-    if (selectedStatus === 'active') {
-      matchesStatus = alert.status === 'New' || alert.status === 'Investigating';
-    } else if (selectedStatus !== 'all') {
-      matchesStatus = alert.status.toLowerCase() === selectedStatus.toLowerCase();
-    }
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearch(e.target.value);
+    setPage(1); // reset to page 1 on new search
+  };
 
-    return matchesSearch && matchesSeverity && matchesStatus;
-  });
+  const handleSeverityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedSeverity(e.target.value);
+    setPage(1);
+  };
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedStatus(e.target.value);
+    setPage(1);
+  };
 
   return (
     <div className="p-4 md:p-8 pb-20 max-w-7xl mx-auto space-y-6 relative text-primary-text">
@@ -120,9 +144,9 @@ export default function AlertsPage() {
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
           <input
             type="text"
-            placeholder="Search alerts by title, actor, reason..."
+            placeholder="Search alerts by title, description..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearchChange}
             className="bg-background border border-border text-xs text-primary-text placeholder-muted rounded-[6px] pl-9 pr-3 py-2 w-full focus:outline-none focus:border-purple-500/40"
           />
         </div>
@@ -130,7 +154,7 @@ export default function AlertsPage() {
         <div className="w-full md:w-44">
           <select
             value={selectedSeverity}
-            onChange={(e) => setSelectedSeverity(e.target.value)}
+            onChange={handleSeverityChange}
             className="bg-background border border-border text-xs text-secondary rounded-[6px] px-3 py-2 w-full focus:outline-none focus:border-purple-500/40 appearance-none cursor-pointer"
           >
             <option value="all">All Severities</option>
@@ -144,11 +168,12 @@ export default function AlertsPage() {
         <div className="w-full md:w-44">
           <select
             value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
+            onChange={handleStatusChange}
             className="bg-background border border-border text-xs text-secondary rounded-[6px] px-3 py-2 w-full focus:outline-none focus:border-purple-500/40 appearance-none cursor-pointer"
           >
             <option value="active">Active Alerts</option>
-            <option value="New">New Only</option>
+            <option value="Open">Open Only</option>
+            <option value="Acknowledged">Acknowledged Only</option>
             <option value="Investigating">Investigating Only</option>
             <option value="Resolved">Resolved</option>
             <option value="Dismissed">Dismissed</option>
@@ -183,16 +208,16 @@ export default function AlertsPage() {
       ) : (
         /* Alerts list */
         <div className="space-y-4">
-          {filteredAlerts.length === 0 ? (
+          {alerts.length === 0 ? (
             <div className="bg-surface border border-border rounded-[12px] p-12 text-center text-xs text-muted">
-              {alerts.length === 0 ? 'No active security alerts' : 'No security alerts found matching the active parameters.'}
+               No security alerts found matching the active parameters.
             </div>
           ) : (
-            filteredAlerts.map((alert) => (
+            alerts.map((alert) => (
               <div 
                 key={alert.id} 
                 className={`bg-surface border rounded-[12px] p-5 flex flex-col md:flex-row justify-between items-start gap-4 transition-colors hover:border-border/80 animate-slide-up ${
-                  alert.status === 'New' 
+                  alert.status === 'Open' 
                     ? 'border-red-500/20' 
                     : 'border-border'
                 }`}
@@ -231,24 +256,23 @@ export default function AlertsPage() {
 
                 <div className="flex items-center gap-2 self-stretch md:self-auto justify-end border-t md:border-t-0 border-border pt-4 md:pt-0 shrink-0">
                   <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                    <RiskBadge score={alert.riskScore} className="text-[10px] px-2 py-0.5 shrink-0" />
-                    
-                    <div className="h-6 w-[1px] bg-border" />
-
-                    {/* Investigate */}
-                    {alert.status === 'New' && (
-                      <button
-                        onClick={() => handleUpdateStatus(alert.id, 'Investigating')}
-                        className="bg-surface-top hover:bg-surface-mid border border-border text-white text-[10px] font-semibold px-2.5 py-1 rounded-[4px] flex items-center gap-1 transition-all cursor-pointer h-7"
-                        title="Mark as Investigating"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-muted" />
-                        <span>Investigate</span>
-                      </button>
+                    {alert.riskScore !== null && (
+                       <RiskBadge score={alert.riskScore} className="text-[10px] px-2 py-0.5 shrink-0" />
                     )}
+                    
+                    <div className="h-6 w-[1px] bg-border mx-1" />
 
-                    {/* Resolve */}
-                    {(alert.status === 'New' || alert.status === 'Investigating') && (
+                    <Link
+                      href={`/alerts/${alert.id}`}
+                      className="bg-surface-top hover:bg-surface-mid border border-border text-white text-[10px] font-semibold px-2.5 py-1 rounded-[4px] flex items-center gap-1 transition-all h-7 cursor-pointer"
+                      title="View Alert Details"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-muted" />
+                      <span>View Details</span>
+                    </Link>
+
+                    {/* Quick Resolve */}
+                    {(alert.status === 'Open' || alert.status === 'Acknowledged' || alert.status === 'Investigating') && (
                       <button
                         onClick={() => handleUpdateStatus(alert.id, 'Resolved')}
                         className="bg-healthy-bg hover:bg-healthy-bg/25 border border-healthy-border text-healthy-text text-[10px] font-semibold px-2.5 py-1 rounded-[4px] flex items-center gap-1 transition-all cursor-pointer h-7"
@@ -259,8 +283,8 @@ export default function AlertsPage() {
                       </button>
                     )}
 
-                    {/* Dismiss */}
-                    {(alert.status === 'New' || alert.status === 'Investigating') && (
+                    {/* Quick Dismiss */}
+                    {(alert.status === 'Open' || alert.status === 'Acknowledged' || alert.status === 'Investigating') && (
                       <button
                         onClick={() => handleUpdateStatus(alert.id, 'Dismissed')}
                         className="text-muted hover:text-secondary p-1 rounded hover:bg-surface-top cursor-pointer"
@@ -269,33 +293,32 @@ export default function AlertsPage() {
                         <XCircle className="w-4 h-4" />
                       </button>
                     )}
-                    
-                    {/* Re-Open */}
-                    {(alert.status === 'Resolved' || alert.status === 'Dismissed') && (
-                      <button
-                        onClick={() => handleUpdateStatus(alert.id, 'New')}
-                        className="bg-surface-top hover:bg-surface-mid border border-border text-secondary text-[10px] font-semibold px-2.5 py-1 rounded-[4px] transition-all cursor-pointer h-7"
-                      >
-                        Re-Open
-                      </button>
-                    )}
-
-                    {/* Investigate deep link redirects */}
-                    {alert.agentId && (
-                      <Link href={`/agents/${alert.agentId}`} className="text-purple-400 hover:text-purple-300 text-[10px] font-semibold px-2 py-1 shrink-0">
-                        Deep Profile &rarr;
-                      </Link>
-                    )}
-                    {alert.identityId && (
-                      <Link href={`/identities/${alert.identityId}`} className="text-purple-400 hover:text-purple-300 text-[10px] font-semibold px-2 py-1 shrink-0">
-                        Deep Profile &rarr;
-                      </Link>
-                    )}
                   </div>
                 </div>
 
               </div>
             ))
+          )}
+          
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-between items-center bg-surface border border-border rounded-[12px] p-4 mt-4">
+               <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-[6px] bg-background border border-border text-secondary hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               >
+                 <ChevronLeft className="w-4 h-4" /> Previous
+               </button>
+               <span className="text-xs text-muted">Page {page} of {totalPages}</span>
+               <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-[6px] bg-background border border-border text-secondary hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+               >
+                 Next <ChevronRight className="w-4 h-4" />
+               </button>
+            </div>
           )}
         </div>
       )}
