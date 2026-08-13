@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useNavigation } from '@/context/NavigationContext';
-import { alertService } from '@/lib/services/alertService';
+
 import { 
   Shield, 
   LayoutDashboard, 
@@ -43,13 +43,21 @@ export default function Sidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [activeAlertsCount, setActiveAlertsCount] = useState<number>(0);
 
-  // Load alert counts dynamically
   useEffect(() => {
     if (!user?.organization_id) return;
     let isMounted = true;
-    alertService.getActiveCount(user.organization_id).then((count) => {
-      if (isMounted) setActiveAlertsCount(count);
-    });
+    
+    fetch('/api/alerts/count')
+      .then(res => res.json())
+      .then(json => {
+        if (isMounted && json.success) {
+          setActiveAlertsCount(json.data.count);
+        }
+      })
+      .catch(err => {
+        console.error('Error fetching alert count:', err);
+      });
+      
     return () => {
       isMounted = false;
     };

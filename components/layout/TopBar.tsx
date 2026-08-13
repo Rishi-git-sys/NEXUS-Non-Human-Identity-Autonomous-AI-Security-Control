@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Menu, Search, Bell, Shield, User, Settings, LogOut, CheckCircle } from 'lucide-react';
 import { useNavigation } from '@/context/NavigationContext';
 import { useAuth } from '@/context/AuthContext';
-import { alertService } from '@/lib/services/alertService';
+
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 
@@ -25,9 +25,16 @@ export default function TopBar() {
   useEffect(() => {
     if (!user?.organization_id) return;
     let isMounted = true;
-    alertService.getActiveCount(user.organization_id).then((count) => {
-      if (isMounted) setActiveAlertsCount(count);
-    });
+    
+    fetch('/api/alerts/count')
+      .then(res => res.json())
+      .then(json => {
+        if (isMounted && json.success) {
+          setActiveAlertsCount(json.data.count);
+        }
+      })
+      .catch(err => console.error('Error fetching alert count:', err));
+      
     return () => {
       isMounted = false;
     };
