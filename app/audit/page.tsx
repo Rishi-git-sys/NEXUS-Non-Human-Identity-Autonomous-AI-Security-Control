@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { auditService } from '@/lib/services/auditService';
 import { AuditEvent } from '@/lib/types/audit';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
 import { Search, Download, X, Terminal, Code, RefreshCw, AlertCircle } from 'lucide-react';
@@ -34,8 +33,14 @@ export default function AuditPage() {
     setError(null);
 
     try {
-      const data = await auditService.getAuditEvents(user.organization_id);
-      setEvents(data);
+      const res = await fetch('/api/audit');
+      if (!res.ok) throw new Error('Unable to load audit ledger telemetry');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setEvents(json.data);
+      } else {
+        throw new Error(json.error || 'Unable to load audit ledger telemetry');
+      }
     } catch (err: unknown) {
       console.error('Error loading audit events from control plane:', err);
       setError('Unable to load audit ledger telemetry from control plane. Please try again.');

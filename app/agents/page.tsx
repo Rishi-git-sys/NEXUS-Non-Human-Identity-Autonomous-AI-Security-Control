@@ -2,8 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { aiAgentService } from '@/lib/services/aiAgentService';
-import { identityService } from '@/lib/services/identityService';
 import { Agent } from '@/lib/types/agent';
 import { Identity } from '@/lib/types/identity';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
@@ -56,12 +54,23 @@ export default function AIAgentsPage() {
     setError(null);
 
     try {
-      const data = await aiAgentService.getAIAgents(user.organization_id);
-      setAgents(data);
+      const [agentsRes, identitiesRes] = await Promise.all([
+        fetch('/api/ai-agents'),
+        fetch('/api/identities'),
+      ]);
 
-      // Load organization identities for linking dropdown
-      const identityList = await identityService.getIdentities(user.organization_id);
-      setIdentities(identityList);
+      if (!agentsRes.ok) throw new Error('Failed to fetch AI agents');
+      const agentsJson = await agentsRes.json();
+      if (agentsJson.success && agentsJson.data) {
+        setAgents(agentsJson.data);
+      }
+
+      if (identitiesRes.ok) {
+        const identitiesJson = await identitiesRes.json();
+        if (identitiesJson.success && identitiesJson.data) {
+          setIdentities(identitiesJson.data);
+        }
+      }
     } catch (err: unknown) {
       console.error('Error fetching AI agents:', err);
       setError('Unable to fetch AI agent telemetry from control plane. Please try again.');
@@ -93,18 +102,24 @@ export default function AIAgentsPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await aiAgentService.createAIAgent(user.organization_id, {
-        name: newName,
-        model: newModel,
-        provider: newProvider,
-        purpose: newPurpose || `Autonomous ${newModel} agent`,
-        environment: newEnv,
-        owner: newOwner,
-        identityId: newIdentityId || null,
-        riskScore: 20,
+      const res = await fetch('/api/ai-agents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          model: newModel,
+          provider: newProvider,
+          purpose: newPurpose || `Autonomous ${newModel} agent`,
+          environment: newEnv,
+          owner: newOwner,
+          identityId: newIdentityId || null,
+          riskScore: 20,
+        }),
       });
 
-      if (res.success) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         showToast('AI Agent registered successfully.', 'success');
         setIsModalOpen(false);
         setNewName('');
@@ -112,7 +127,7 @@ export default function AIAgentsPage() {
         setNewIdentityId('');
         await fetchAgents(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to register AI agent.', 'error');
       }
     } catch (err) {
       console.error('Error registering agent:', err);

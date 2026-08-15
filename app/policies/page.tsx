@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { policyService } from '@/lib/services/policyService';
 import { Policy } from '@/lib/types/policy';
 import { Search, Plus, Trash2, Edit2, ShieldAlert, Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { formatTimestamp } from '@/lib/utils';
@@ -42,8 +41,14 @@ export default function PoliciesPage() {
     setError(null);
 
     try {
-      const data = await policyService.getPolicies(user.organization_id);
-      setPolicies(data);
+      const res = await fetch('/api/policies');
+      if (!res.ok) throw new Error('Unable to load security policies');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setPolicies(json.data);
+      } else {
+        throw new Error(json.error || 'Unable to load security policies');
+      }
     } catch (err: unknown) {
       console.error('Error loading policies from control plane:', err);
       setError('Unable to load security policies from control plane. Please try again.');
@@ -70,12 +75,19 @@ export default function PoliciesPage() {
 
     const nextStatus: Policy['status'] = currentStatus === 'Active' ? 'Inactive' : 'Active';
     try {
-      const res = await policyService.updatePolicyStatus(user.organization_id, id, nextStatus);
-      if (res.success) {
+      const res = await fetch(`/api/policies/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         showToast(`Policy marked as ${nextStatus}.`, 'success');
         await fetchPolicies(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to update policy status.', 'error');
       }
     } catch (err) {
       console.error('Error updating policy status:', err);
@@ -120,38 +132,50 @@ export default function PoliciesPage() {
     setIsSubmitting(true);
     try {
       if (modalType === 'create') {
-        const res = await policyService.createPolicy(user.organization_id, user.id, {
-          name: formName,
-          description: formDescription,
-          scope: formScope || 'All Scopes',
-          severity: formSeverity,
-          decision: formDecision,
-          status: 'Active',
-          conditions: []
+        const res = await fetch('/api/policies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formName,
+            description: formDescription,
+            scope: formScope || 'All Scopes',
+            severity: formSeverity,
+            decision: formDecision,
+            status: 'Active',
+            conditions: [],
+          }),
         });
 
-        if (res.success) {
+        const json = await res.json();
+
+        if (res.ok && json.success) {
           showToast('Policy created successfully.', 'success');
           setModalType(null);
           await fetchPolicies(true);
         } else {
-          showToast(res.message, 'error');
+          showToast(json.error || 'Failed to create policy.', 'error');
         }
       } else if (modalType === 'edit' && activePolicy) {
-        const res = await policyService.updatePolicy(user.organization_id, activePolicy.id, {
-          name: formName,
-          description: formDescription,
-          scope: formScope,
-          severity: formSeverity,
-          decision: formDecision
+        const res = await fetch(`/api/policies/${activePolicy.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formName,
+            description: formDescription,
+            scope: formScope,
+            severity: formSeverity,
+            decision: formDecision,
+          }),
         });
 
-        if (res.success) {
+        const json = await res.json();
+
+        if (res.ok && json.success) {
           showToast('Policy configuration updated.', 'success');
           setModalType(null);
           await fetchPolicies(true);
         } else {
-          showToast(res.message, 'error');
+          showToast(json.error || 'Failed to update policy.', 'error');
         }
       }
     } catch (err) {
@@ -167,13 +191,18 @@ export default function PoliciesPage() {
     setIsSubmitting(true);
 
     try {
-      const res = await policyService.deletePolicy(user.organization_id, activePolicy.id);
-      if (res.success) {
+      const res = await fetch(`/api/policies/${activePolicy.id}`, {
+        method: 'DELETE',
+      });
+
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         showToast('Policy deleted successfully.', 'success');
         setModalType(null);
         await fetchPolicies(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Error deleting policy.', 'error');
       }
     } catch (err) {
       console.error('Error deleting policy:', err);

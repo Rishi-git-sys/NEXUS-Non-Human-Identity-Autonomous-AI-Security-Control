@@ -3,12 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { 
-  identityService, 
   mapUITypeToDB, 
   VALID_DB_IDENTITY_TYPES,
   mapUIStatusToDB,
   VALID_DB_IDENTITY_STATUSES
-} from '@/lib/services/identityService';
+} from '@/lib/types/identity';
 import { Identity, IdentityType } from '@/lib/types/identity';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
 import { 
@@ -64,8 +63,14 @@ export default function IdentitiesPage() {
     setError(null);
 
     try {
-      const data = await identityService.getIdentities(user.organization_id);
-      setIdentities(data);
+      const res = await fetch('/api/identities');
+      if (!res.ok) throw new Error('Unable to fetch identity catalog');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setIdentities(json.data);
+      } else {
+        throw new Error(json.error || 'Unable to fetch identity catalog');
+      }
     } catch (err: unknown) {
       console.error('Error loading identities from database:', err);
       setError('Unable to fetch identity catalog from control plane. Please try again.');
@@ -91,7 +96,6 @@ export default function IdentitiesPage() {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
       setSortBy(field);
-      setSortOrder('desc');
     }
   };
 
@@ -118,23 +122,29 @@ export default function IdentitiesPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await identityService.createIdentity(user.organization_id, {
-        name: newIdentityName,
-        type: newIdentityType,
-        status: 'Active',
-        riskScore: 25,
-        environment: newIdentityEnv,
-        provider: newIdentityProvider,
-        owner: newIdentityOwner,
+      const res = await fetch('/api/identities', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newIdentityName,
+          type: newIdentityType,
+          status: 'Active',
+          riskScore: 25,
+          environment: newIdentityEnv,
+          provider: newIdentityProvider,
+          owner: newIdentityOwner,
+        }),
       });
 
-      if (res.success) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         showToast('New identity registered successfully.', 'success');
         setIsAddModalOpen(false);
         setNewIdentityName('');
         await fetchIdentities(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to create identity.', 'error');
       }
     } catch (err) {
       console.error('Failed to create identity:', err);

@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { resourceService } from '@/lib/services/resourceService';
 import { ResourceItem, ResourceType, ResourceSensitivity, ResourceStatus } from '@/lib/types/resource';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
 import { 
@@ -59,8 +58,14 @@ export default function ResourcesPage() {
     setError(null);
 
     try {
-      const data = await resourceService.getResources(user.organization_id);
-      setResources(data);
+      const res = await fetch('/api/resources');
+      if (!res.ok) throw new Error('Unable to fetch resource inventory');
+      const json = await res.json();
+      if (json.success && json.data) {
+        setResources(json.data);
+      } else {
+        throw new Error(json.error || 'Unable to fetch resource inventory');
+      }
     } catch (err: unknown) {
       console.error('Error loading resources from database:', err);
       setError('Unable to fetch resource inventory from control plane. Please try again.');
@@ -92,24 +97,30 @@ export default function ResourcesPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await resourceService.createResource(user.organization_id, {
-        name: newName,
-        resourceType: newType,
-        sensitivity: newSensitivity,
-        status: newStatus,
-        environment: newEnv,
-        owner: newOwner,
-        description: newDescription || `${newName} cloud resource asset`,
+      const res = await fetch('/api/resources', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newName,
+          resourceType: newType,
+          sensitivity: newSensitivity,
+          status: newStatus,
+          environment: newEnv,
+          owner: newOwner,
+          description: newDescription || `${newName} cloud resource asset`,
+        }),
       });
 
-      if (res.success) {
+      const json = await res.json();
+
+      if (res.ok && json.success) {
         showToast('Target resource registered successfully.', 'success');
         setIsAddModalOpen(false);
         setNewName('');
         setNewDescription('');
         await fetchResources(true);
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Error registering target resource.', 'error');
       }
     } catch (err) {
       console.error('Failed to create resource:', err);

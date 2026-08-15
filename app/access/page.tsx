@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { accessGraphService, GraphNode, GraphEdge } from '@/lib/services/accessGraphService';
+import type { GraphNode, GraphEdge } from '@/lib/types/access';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
 import { 
   ZoomIn, 
@@ -49,14 +49,22 @@ export default function AccessGraphPage() {
     setError(null);
 
     try {
-      const graphData = await accessGraphService.getAccessGraph(user.organization_id);
-      setNodes(graphData.nodes);
-      setEdges(graphData.edges);
+      const res = await fetch('/api/access-graph');
+      if (!res.ok) {
+        throw new Error(`Failed to fetch access graph: ${res.statusText}`);
+      }
+      const json = await res.json();
+      if (json.success && json.data) {
+        setNodes(json.data.nodes || []);
+        setEdges(json.data.edges || []);
 
-      if (graphData.nodes.length > 0) {
-        setSelectedNode(graphData.nodes[0]);
+        if (json.data.nodes?.length > 0) {
+          setSelectedNode(json.data.nodes[0]);
+        } else {
+          setSelectedNode(null);
+        }
       } else {
-        setSelectedNode(null);
+        throw new Error(json.error || 'Failed to load access graph topology');
       }
     } catch (err: unknown) {
       console.error('Error fetching Access Graph telemetry:', err);

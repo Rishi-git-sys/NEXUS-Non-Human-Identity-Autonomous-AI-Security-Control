@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { dashboardService, DashboardData } from '@/lib/services/dashboardService';
+import type { DashboardData } from '@/lib/types/dashboard';
 import { RiskTrendChart } from '@/components/ui/RiskTrendChart';
 import { 
   Shield, 
@@ -52,8 +52,16 @@ export default function DashboardPage() {
     setError(null);
 
     try {
-      const telemetry = await dashboardService.getDashboardData(user.organization_id, timeframe);
-      setData(telemetry);
+      const res = await fetch(`/api/dashboard?timeframe=${timeframe}`);
+      if (!res.ok) {
+        throw new Error(`Failed to load dashboard: ${res.statusText}`);
+      }
+      const json = await res.json();
+      if (json.success && json.data) {
+        setData(json.data);
+      } else {
+        throw new Error(json.error || 'Failed to fetch telemetry');
+      }
     } catch (err: unknown) {
       console.error('Failed to load dashboard telemetry:', err);
       setError('Unable to load security telemetry from control plane. Please verify connection and retry.');
@@ -101,14 +109,14 @@ export default function DashboardPage() {
           clearInterval(interval);
           setScanState('success');
           
-          // Log scan to audit_logs in database
-          dashboardService.logScanAudit(
-            user.organization_id!,
-            user.id,
-            user.full_name || 'System Operator'
-          ).then(() => {
-            loadDashboardData(true);
-          });
+          // Log scan to audit_logs via authenticated server API route
+          fetch('/api/dashboard/scan', { method: 'POST' })
+            .then(() => {
+              loadDashboardData(true);
+            })
+            .catch((err) => {
+              console.error('Failed to record scan audit event:', err);
+            });
           
           setTimeout(() => setScanState('idle'), 5000);
           return 100;

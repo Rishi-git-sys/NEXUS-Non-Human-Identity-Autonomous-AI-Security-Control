@@ -2,7 +2,6 @@
 
 import { use, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { aiAgentService } from '@/lib/services/aiAgentService';
 import { Agent } from '@/lib/types/agent';
 import { AuditEvent } from '@/lib/types/audit';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
@@ -10,7 +9,6 @@ import { Cpu, ArrowLeft, Ban, PlayCircle, Key, Network, ScrollText, AlertTriangl
 import Link from 'next/link';
 import { formatTimestamp } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
-import { supabase } from '@/lib/supabase/client';
 
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -37,40 +35,31 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     setError(null);
 
     try {
-      const data = await aiAgentService.getAIAgentById(user.organization_id, id);
-      if (!data) {
+      const [agentRes, auditRes] = await Promise.all([
+        fetch(`/api/ai-agents/${id}`),
+        fetch('/api/audit'),
+      ]);
+
+      if (!agentRes.ok) {
         setError('AI Agent record not found.');
         setAgent(null);
       } else {
-        setAgent(data);
+        const agentJson = await agentRes.json();
+        if (agentJson.success && agentJson.data) {
+          setAgent(agentJson.data);
+        } else {
+          setError(agentJson.error || 'AI Agent record not found.');
+          setAgent(null);
+        }
+      }
 
-        // Fetch audit log events for this agent
-        const { data: logsData } = await supabase
-          .from('audit_logs')
-          .select('*')
-          .eq('organization_id', user.organization_id)
-          .or(`actor_id.eq.${id},entity_id.eq.${id}`)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (logsData) {
-          const mappedEvents: AuditEvent[] = logsData.map(log => {
-            const meta = (typeof log.metadata === 'object' && log.metadata !== null) ? log.metadata as Record<string, unknown> : {};
-            return {
-              id: log.id,
-              timestamp: log.created_at,
-              actor: (meta.actor as string) || log.actor_id || 'System Controller',
-              actorId: log.actor_id || '',
-              action: log.action,
-              resource: (meta.resource as string) || log.entity_type || 'ai_agent',
-              environment: (meta.environment as string) || 'Production',
-              decision: (meta.decision as AuditEvent['decision']) || 'ALLOWED',
-              riskScore: typeof meta.riskScore === 'number' ? meta.riskScore : 10,
-              ipAddress: (meta.ipAddress as string) || '127.0.0.1',
-              reason: (meta.reason as string) || 'Policy engine execution boundary check.',
-            };
-          });
-          setActivity(mappedEvents);
+      if (auditRes.ok) {
+        const auditJson = await auditRes.json();
+        if (auditJson.success && Array.isArray(auditJson.data)) {
+          const agentLogs = (auditJson.data as AuditEvent[]).filter(
+            (log) => log.actorId === id || log.resource?.includes(id) || (log.metadata as Record<string, unknown>)?.entityId === id
+          );
+          setActivity(agentLogs.slice(0, 20));
         }
       }
     } catch (err: unknown) {
@@ -98,29 +87,19 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(true);
 
     try {
-      const res = await aiAgentService.freezeAgent(user.organization_id, agent.id);
-      if (res.success && res.agent) {
-        setAgent(res.agent);
+      const res = await fetch(`/api/ai-agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'freeze' }),
+      });
 
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'FREEZE_AGENT',
-          entity_type: 'ai_agent',
-          entity_id: agent.id,
-          metadata: {
-            actor: user.full_name || 'Security Controller',
-            resource: `agent/${agent.id}`,
-            environment: agent.environment,
-            decision: 'ALLOWED',
-            riskScore: 0,
-            reason: `Agent "${agent.name}" has been frozen and isolated due to operator request.`,
-          },
-        });
+      const json = await res.json();
 
+      if (res.ok && json.success) {
+        setAgent(json.data);
         showToast('Agent frozen and isolated successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to freeze AI agent.', 'error');
       }
     } catch (err) {
       console.error('Error freezing agent:', err);
@@ -137,29 +116,19 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(true);
 
     try {
-      const res = await aiAgentService.unfreezeAgent(user.organization_id, agent.id);
-      if (res.success && res.agent) {
-        setAgent(res.agent);
+      const res = await fetch(`/api/ai-agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'unfreeze' }),
+      });
 
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'UNFREEZE_AGENT',
-          entity_type: 'ai_agent',
-          entity_id: agent.id,
-          metadata: {
-            actor: user.full_name || 'Security Controller',
-            resource: `agent/${agent.id}`,
-            environment: agent.environment,
-            decision: 'ALLOWED',
-            riskScore: 10,
-            reason: `Agent "${agent.name}" has been reactivated and restored to baseline operations.`,
-          },
-        });
+      const json = await res.json();
 
+      if (res.ok && json.success) {
+        setAgent(json.data);
         showToast('Agent reactivated successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to reactivate AI agent.', 'error');
       }
     } catch (err) {
       console.error('Error reactivating agent:', err);
@@ -176,23 +145,19 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     setIsSubmitting(true);
 
     try {
-      await supabase.from('audit_logs').insert({
-        organization_id: user.organization_id,
-        actor_id: user.id,
-        action: 'ROTATE_SECRET',
-        entity_type: 'ai_agent',
-        entity_id: agent.id,
-        metadata: {
-          actor: user.full_name || 'Security Controller',
-          resource: `agent-secrets/${agent.id}`,
-          environment: agent.environment,
-          decision: 'ALLOWED',
-          riskScore: 10,
-          reason: `Rotated access token credentials for agent ${agent.name}.`,
-        },
+      const res = await fetch(`/api/ai-agents/${agent.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rotate' }),
       });
 
-      showToast('Agent API key rotated successfully.', 'success');
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        showToast('Agent API key rotated successfully.', 'success');
+      } else {
+        showToast(json.error || 'Failed to rotate token.', 'error');
+      }
     } catch (err) {
       console.error('Error rotating agent token:', err);
       showToast('Failed to rotate token.', 'error');

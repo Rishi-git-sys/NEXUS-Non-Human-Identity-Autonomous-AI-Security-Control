@@ -2,7 +2,6 @@
 
 import { use, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { identityService } from '@/lib/services/identityService';
 import { Identity, RiskFactor } from '@/lib/types/identity';
 import { AuditEvent } from '@/lib/types/audit';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
@@ -10,7 +9,6 @@ import { Shield, ShieldAlert, Key, Ban, UserCheck, AlertTriangle, ArrowLeft, Clo
 import Link from 'next/link';
 import { formatTimestamp } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
-import { supabase } from '@/lib/supabase/client';
 
 export default function IdentityDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
@@ -27,7 +25,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
   const [modalType, setModalType] = useState<'disable' | 'enable' | 'rotate' | 'revoke' | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load identity and activity log data from Supabase
+  // Load identity and activity log data via API routes
   const loadData = useCallback(async () => {
     if (!user?.organization_id || !id) {
       setIsLoading(false);
@@ -38,40 +36,31 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     setError(null);
 
     try {
-      const data = await identityService.getIdentityById(user.organization_id, id);
-      if (!data) {
+      const [identityRes, auditRes] = await Promise.all([
+        fetch(`/api/identities/${id}`),
+        fetch('/api/audit'),
+      ]);
+
+      if (!identityRes.ok) {
         setError('Identity record not found.');
         setIdentity(null);
       } else {
-        setIdentity(data);
+        const idJson = await identityRes.json();
+        if (idJson.success && idJson.data) {
+          setIdentity(idJson.data);
+        } else {
+          setError(idJson.error || 'Identity record not found.');
+          setIdentity(null);
+        }
+      }
 
-        // Fetch audit logs related to this identity from Supabase
-        const { data: logsData } = await supabase
-          .from('audit_logs')
-          .select('*')
-          .eq('organization_id', user.organization_id)
-          .or(`actor_id.eq.${id},entity_id.eq.${id}`)
-          .order('created_at', { ascending: false })
-          .limit(20);
-
-        if (logsData) {
-          const mappedEvents: AuditEvent[] = logsData.map(log => {
-            const meta = (typeof log.metadata === 'object' && log.metadata !== null) ? log.metadata as Record<string, unknown> : {};
-            return {
-              id: log.id,
-              timestamp: log.created_at,
-              actor: (meta.actor as string) || log.actor_id || 'System Operator',
-              actorId: log.actor_id || '',
-              action: log.action,
-              resource: (meta.resource as string) || log.entity_type || 'identity',
-              environment: (meta.environment as string) || 'Production',
-              decision: (meta.decision as AuditEvent['decision']) || 'ALLOWED',
-              riskScore: typeof meta.riskScore === 'number' ? meta.riskScore : 10,
-              ipAddress: (meta.ipAddress as string) || '127.0.0.1',
-              reason: (meta.reason as string) || 'Security policy evaluation.',
-            };
-          });
-          setActivity(mappedEvents);
+      if (auditRes.ok) {
+        const auditJson = await auditRes.json();
+        if (auditJson.success && Array.isArray(auditJson.data)) {
+          const identityLogs = (auditJson.data as AuditEvent[]).filter(
+            (log) => log.actorId === id || log.resource?.includes(id) || (log.metadata as Record<string, unknown>)?.entityId === id
+          );
+          setActivity(identityLogs.slice(0, 20));
         }
       }
     } catch (err: unknown) {
@@ -94,35 +83,25 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     }
   }, [user, loadData]);
 
-  // Operations connecting to Supabase
+  // Operations connecting to authenticated API routes
   const handleDisable = async () => {
     if (!identity || !user?.organization_id) return;
     setIsSubmitting(true);
 
     try {
-      const res = await identityService.disableIdentity(user.organization_id, identity.id);
-      if (res.success && res.identity) {
-        setIdentity(res.identity);
-        
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'DISABLE_IDENTITY',
-          entity_type: 'identity',
-          entity_id: identity.id,
-          metadata: {
-            actor: user.full_name || 'System Operator',
-            resource: `identity/${identity.id}`,
-            environment: identity.environment,
-            decision: 'ALLOWED',
-            riskScore: 0,
-            reason: `Identity "${identity.name}" has been disabled/suspended by operator request.`,
-          },
-        });
+      const res = await fetch(`/api/identities/${identity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'disable' }),
+      });
 
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setIdentity(json.data);
         showToast('Identity disabled successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to disable identity.', 'error');
       }
     } catch (err) {
       console.error('Failed to disable identity:', err);
@@ -139,29 +118,19 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     setIsSubmitting(true);
 
     try {
-      const res = await identityService.enableIdentity(user.organization_id, identity.id);
-      if (res.success && res.identity) {
-        setIdentity(res.identity);
-        
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'ENABLE_IDENTITY',
-          entity_type: 'identity',
-          entity_id: identity.id,
-          metadata: {
-            actor: user.full_name || 'System Operator',
-            resource: `identity/${identity.id}`,
-            environment: identity.environment,
-            decision: 'ALLOWED',
-            riskScore: 10,
-            reason: `Identity "${identity.name}" has been re-enabled and restored to active state.`,
-          },
-        });
+      const res = await fetch(`/api/identities/${identity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'enable' }),
+      });
 
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setIdentity(json.data);
         showToast('Identity re-enabled successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to enable identity.', 'error');
       }
     } catch (err) {
       console.error('Failed to enable identity:', err);
@@ -178,29 +147,19 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     setIsSubmitting(true);
 
     try {
-      const res = await identityService.rotateCredential(user.organization_id, identity.id);
-      if (res.success && res.identity) {
-        setIdentity(res.identity);
-        
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'ROTATE_CREDENTIALS',
-          entity_type: 'identity',
-          entity_id: identity.id,
-          metadata: {
-            actor: user.full_name || 'System Operator',
-            resource: `credentials/${identity.id}`,
-            environment: identity.environment,
-            decision: 'ALLOWED',
-            riskScore: 10,
-            reason: `Credentials for identity "${identity.name}" rotated. CredentialAgeDays reset to 0.`,
-          },
-        });
+      const res = await fetch(`/api/identities/${identity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rotate' }),
+      });
 
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setIdentity(json.data);
         showToast('Credentials rotated successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to rotate credentials.', 'error');
       }
     } catch (err) {
       console.error('Failed to rotate credentials:', err);
@@ -217,29 +176,19 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     setIsSubmitting(true);
 
     try {
-      const res = await identityService.revokeAccess(user.organization_id, identity.id);
-      if (res.success && res.identity) {
-        setIdentity(res.identity);
-        
-        await supabase.from('audit_logs').insert({
-          organization_id: user.organization_id,
-          actor_id: user.id,
-          action: 'REVOKE_ACCESS',
-          entity_type: 'identity',
-          entity_id: identity.id,
-          metadata: {
-            actor: user.full_name || 'System Operator',
-            resource: `permissions/${identity.id}`,
-            environment: identity.environment,
-            decision: 'ALLOWED',
-            riskScore: 0,
-            reason: `Permissions and cloud access for identity "${identity.name}" have been revoked.`,
-          },
-        });
+      const res = await fetch(`/api/identities/${identity.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'revoke' }),
+      });
 
+      const json = await res.json();
+
+      if (res.ok && json.success) {
+        setIdentity(json.data);
         showToast('Access permissions revoked successfully.', 'success');
       } else {
-        showToast(res.message, 'error');
+        showToast(json.error || 'Failed to revoke access.', 'error');
       }
     } catch (err) {
       console.error('Failed to revoke access:', err);

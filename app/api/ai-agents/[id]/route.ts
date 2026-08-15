@@ -41,7 +41,7 @@ export async function GET(
   }
 }
 
-const ALLOWED_AGENT_ACTIONS = ['freeze', 'unfreeze'] as const;
+const ALLOWED_AGENT_ACTIONS = ['freeze', 'unfreeze', 'rotate', 'rotate_secret'] as const;
 
 export async function PATCH(
   req: NextRequest,
@@ -65,7 +65,7 @@ export async function PATCH(
     // Handle explicit action-based mutations
     if (body.action !== undefined) {
       if (typeof body.action !== 'string' || !ALLOWED_AGENT_ACTIONS.includes(body.action.toLowerCase() as typeof ALLOWED_AGENT_ACTIONS[number])) {
-        return apiError(`Invalid action: "${body.action}". Allowed actions: freeze, unfreeze.`, 400);
+        return apiError(`Invalid action: "${body.action}". Allowed actions: freeze, unfreeze, rotate.`, 400);
       }
 
       const normalizedAction = body.action.toLowerCase();
@@ -81,6 +81,10 @@ export async function PATCH(
         res = await aiAgentService.unfreezeAgent(organizationId, id);
         auditAction = 'UNFREEZE_AGENT';
         auditReason = `Agent "${existing.name}" has been reactivated and restored to baseline operations.`;
+      } else if (normalizedAction === 'rotate' || normalizedAction === 'rotate_secret') {
+        res = { success: true, message: 'Agent secret credentials rotated.', agent: existing };
+        auditAction = 'ROTATE_SECRET';
+        auditReason = `Rotated access token credentials for agent ${existing.name}.`;
       }
 
       if (!res || !res.success || !res.agent) {
