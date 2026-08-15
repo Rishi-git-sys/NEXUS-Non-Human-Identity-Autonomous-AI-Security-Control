@@ -2,10 +2,13 @@ import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { dashboardService } from '@/lib/services/dashboardService';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
 export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireAuth();
+    const { user, organizationId } = await requireAuth();
+    const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     const url = new URL(req.url);
     const timeframe = (url.searchParams.get('timeframe') || '7d') as '7d' | '30d' | '90d';

@@ -5,14 +5,18 @@ import { createClient } from '@/lib/supabase/server';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
 import { aiAgentService, mapAgentStatusToDB } from '@/lib/services/aiAgentService';
 import { Database } from '@/types/supabase';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { organizationId } = await requireAuth();
+    const { user, organizationId } = await requireAuth();
+    const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
+
     const supabase = await createClient();
 
     const { data, error } = await supabase
@@ -50,6 +54,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const { user, profile, organizationId } = await requireRole(['admin', 'analyst']);
+    const rl = await enforceRateLimit(req, 'MUTATION', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
+
     const body = await req.json();
 
     if (body.organization_id && body.organization_id !== organizationId) {

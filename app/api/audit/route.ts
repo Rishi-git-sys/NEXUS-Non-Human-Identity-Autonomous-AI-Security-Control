@@ -1,10 +1,14 @@
+import { NextRequest } from 'next/server';
 import { requireAuth } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { auditService } from '@/lib/services/auditService';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireAuth();
+    const { user, organizationId } = await requireAuth();
+    const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     const auditLogs = await auditService.getAuditEvents(organizationId);
     return apiSuccess(auditLogs);

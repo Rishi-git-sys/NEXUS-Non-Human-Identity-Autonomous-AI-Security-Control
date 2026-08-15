@@ -1,13 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth/authorization';
 import { getAWSClient, hasAWSConfiguration } from '@/lib/integrations/aws/client';
 import { ListUsersCommand } from '@aws-sdk/client-iam';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     // 1. & 2. & 3. Authenticate, Require User, Verify Profile & Organization
     // Only administrators can test the AWS integration initially
-    await requireRole(['admin']);
+    const { user, organizationId } = await requireRole(['admin']);
+    const rl = await enforceRateLimit(req, 'EXPENSIVE', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     // 4. Verify AWS configuration exists
     if (!hasAWSConfiguration()) {

@@ -1,12 +1,15 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { requireRole } from '@/lib/auth/authorization';
 import { hasAWSConfiguration } from '@/lib/integrations/aws/client';
 import { discoverIAMIdentities } from '@/lib/integrations/aws/iam';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     // Authenticated user required, organization determined from authenticated profile
-    await requireRole(['admin']);
+    const { user, organizationId } = await requireRole(['admin']);
+    const rl = await enforceRateLimit(req, 'EXPENSIVE', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     if (!hasAWSConfiguration()) {
       return NextResponse.json(

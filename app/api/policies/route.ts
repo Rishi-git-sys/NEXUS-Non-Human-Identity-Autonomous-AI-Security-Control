@@ -3,10 +3,13 @@ import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { policyService } from '@/lib/services/policyService';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const { organizationId } = await requireAuth();
+    const { user, organizationId } = await requireAuth();
+    const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     const policies = await policyService.getPolicies(organizationId);
     return apiSuccess(policies);
@@ -23,6 +26,9 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const { user, organizationId } = await requireRole(['admin', 'analyst']);
+    const rl = await enforceRateLimit(req, 'MUTATION', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
+
     const body = await req.json();
 
     if (!body.name || typeof body.name !== 'string' || !body.name.trim()) {

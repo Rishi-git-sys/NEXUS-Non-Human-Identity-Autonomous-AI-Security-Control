@@ -3,14 +3,17 @@ import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiNotFound, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { alertService } from '@/lib/services/alertService';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
+import { enforceRateLimit } from '@/lib/security/rateLimit';
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { organizationId } = await requireAuth();
+    const { user, organizationId } = await requireAuth();
+    const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
 
     const alert = await alertService.getAlertById(organizationId, id);
     if (!alert) {
@@ -35,6 +38,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const { user, organizationId } = await requireRole(['admin', 'analyst']);
+    const rl = await enforceRateLimit(req, 'MUTATION', { userId: user.id, organizationId });
+    if (!rl.success && rl.response) return rl.response;
+
     const body = await req.json();
 
     if (!body.status) {
