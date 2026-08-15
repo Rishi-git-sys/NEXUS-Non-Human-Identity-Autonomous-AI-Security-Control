@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiNotFound, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { createClient } from '@/lib/supabase/server';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
-import { mapUITypeToDB, mapUIStatusToDB } from '@/lib/services/identityService';
+import { identityService, mapUITypeToDB, mapUIStatusToDB } from '@/lib/services/identityService';
 import { Database } from '@/types/supabase';
 
 export async function GET(
@@ -41,19 +41,74 @@ export async function GET(
   }
 }
 
+const ALLOWED_IDENTITY_ACTIONS = ['disable', 'enable', 'rotate', 'rotate_credential', 'revoke', 'revoke_access'] as const;
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireRole(['admin', 'analyst']);
+    const { user, profile, organizationId } = await requireRole(['admin', 'analyst']);
     const body = await req.json();
 
     if (body.organization_id && body.organization_id !== organizationId) {
       return apiForbidden('Modifying organization ownership is strictly prohibited.');
     }
 
+    // Verify identity exists and belongs to this organization
+    const existing = await identityService.getIdentityById(organizationId, id);
+    if (!existing) {
+      return apiNotFound('Identity not found.');
+    }
+
+    // Handle explicit action-based mutations
+    if (body.action !== undefined) {
+      if (typeof body.action !== 'string' || !ALLOWED_IDENTITY_ACTIONS.includes(body.action.toLowerCase() as typeof ALLOWED_IDENTITY_ACTIONS[number])) {
+        return apiError(`Invalid action: "${body.action}". Allowed actions: disable, enable, rotate, revoke.`, 400);
+      }
+
+      const normalizedAction = body.action.toLowerCase();
+      let res;
+      let auditAction = 'identity.updated';
+
+      if (normalizedAction === 'disable') {
+        res = await identityService.disableIdentity(organizationId, id);
+        auditAction = 'identity.disabled';
+      } else if (normalizedAction === 'enable') {
+        res = await identityService.enableIdentity(organizationId, id);
+        auditAction = 'identity.enabled';
+      } else if (normalizedAction === 'rotate' || normalizedAction === 'rotate_credential') {
+        res = await identityService.rotateCredential(organizationId, id);
+        auditAction = 'identity.rotated';
+      } else if (normalizedAction === 'revoke' || normalizedAction === 'revoke_access') {
+        res = await identityService.revokeAccess(organizationId, id);
+        auditAction = 'identity.revoked';
+      }
+
+      if (!res || !res.success || !res.identity) {
+        return apiError(res?.message || 'Failed to execute identity action.', 400);
+      }
+
+      await writeAuditLog({
+        organizationId,
+        actorId: user.id,
+        action: auditAction,
+        entityType: 'identity',
+        entityId: id,
+        metadata: {
+          action: normalizedAction,
+          actor: profile?.full_name || user.email || 'Security Controller',
+          identityName: existing.name,
+          previousStatus: existing.status,
+          newStatus: res.identity.status,
+        },
+      });
+
+      return apiSuccess(res.identity);
+    }
+
+    // Otherwise handle property updates
     const updates: Database['public']['Tables']['identities']['Update'] = {
       updated_at: new Date().toISOString(),
     };

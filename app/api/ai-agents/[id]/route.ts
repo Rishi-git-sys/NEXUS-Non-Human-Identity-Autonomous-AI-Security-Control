@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiNotFound, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { createClient } from '@/lib/supabase/server';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
-import { mapAgentStatusToDB } from '@/lib/services/aiAgentService';
+import { aiAgentService, mapAgentStatusToDB } from '@/lib/services/aiAgentService';
 import { Database } from '@/types/supabase';
 
 export async function GET(
@@ -41,19 +41,72 @@ export async function GET(
   }
 }
 
+const ALLOWED_AGENT_ACTIONS = ['freeze', 'unfreeze'] as const;
+
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id } = await params;
-    const { user, organizationId } = await requireRole(['admin', 'analyst']);
+    const { user, profile, organizationId } = await requireRole(['admin', 'analyst']);
     const body = await req.json();
 
     if (body.organization_id && body.organization_id !== organizationId) {
       return apiForbidden('Modifying organization ownership is strictly prohibited.');
     }
 
+    // Verify AI agent exists and belongs to this organization
+    const existing = await aiAgentService.getAIAgentById(organizationId, id);
+    if (!existing) {
+      return apiNotFound('AI agent not found.');
+    }
+
+    // Handle explicit action-based mutations
+    if (body.action !== undefined) {
+      if (typeof body.action !== 'string' || !ALLOWED_AGENT_ACTIONS.includes(body.action.toLowerCase() as typeof ALLOWED_AGENT_ACTIONS[number])) {
+        return apiError(`Invalid action: "${body.action}". Allowed actions: freeze, unfreeze.`, 400);
+      }
+
+      const normalizedAction = body.action.toLowerCase();
+      let res;
+      let auditAction = 'agent.updated';
+      let auditReason = '';
+
+      if (normalizedAction === 'freeze') {
+        res = await aiAgentService.freezeAgent(organizationId, id);
+        auditAction = 'FREEZE_AGENT';
+        auditReason = `Agent "${existing.name}" has been frozen and isolated due to operator request.`;
+      } else if (normalizedAction === 'unfreeze') {
+        res = await aiAgentService.unfreezeAgent(organizationId, id);
+        auditAction = 'UNFREEZE_AGENT';
+        auditReason = `Agent "${existing.name}" has been reactivated and restored to baseline operations.`;
+      }
+
+      if (!res || !res.success || !res.agent) {
+        return apiError(res?.message || 'Failed to execute agent action.', 400);
+      }
+
+      await writeAuditLog({
+        organizationId,
+        actorId: user.id,
+        action: auditAction,
+        entityType: 'ai_agent',
+        entityId: id,
+        metadata: {
+          actor: profile?.full_name || (user.user_metadata?.full_name as string) || user.email || 'Security Controller',
+          resource: `agent/${id}`,
+          environment: existing.environment,
+          decision: 'ALLOWED',
+          riskScore: normalizedAction === 'freeze' ? 0 : 10,
+          reason: auditReason,
+        },
+      });
+
+      return apiSuccess(res.agent);
+    }
+
+    // Otherwise handle property updates
     const updates: Database['public']['Tables']['ai_agents']['Update'] = {
       updated_at: new Date().toISOString(),
     };

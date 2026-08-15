@@ -41,6 +41,11 @@ export async function PATCH(
       return apiForbidden('Modifying organization ownership is strictly prohibited.');
     }
 
+    const existing = await policyService.getPolicyById(organizationId, id);
+    if (!existing) {
+      return apiNotFound('Policy not found.');
+    }
+
     let res;
     if (body.status && Object.keys(body).length === 1) {
       res = await policyService.updatePolicyStatus(organizationId, id, body.status);
@@ -65,6 +70,45 @@ export async function PATCH(
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to update policy.';
+
+    if (status === 401) return apiUnauthorized(message);
+    if (status === 403) return apiForbidden(message);
+    return apiError(message, status);
+  }
+}
+
+export async function DELETE(
+  _: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { user, organizationId } = await requireRole(['admin', 'analyst']);
+
+    // Check if policy exists and belongs to this organization
+    const existing = await policyService.getPolicyById(organizationId, id);
+    if (!existing) {
+      return apiNotFound('Policy not found.');
+    }
+
+    const res = await policyService.deletePolicy(organizationId, id);
+    if (!res.success) {
+      return apiError(res.message, 400);
+    }
+
+    await writeAuditLog({
+      organizationId,
+      actorId: user.id,
+      action: 'policy.deleted',
+      entityType: 'policy',
+      entityId: id,
+      metadata: { name: existing.name, severity: existing.severity },
+    });
+
+    return apiSuccess({ message: 'Policy deleted successfully.' });
+  } catch (err: unknown) {
+    const status = (err as Record<string, unknown>)?.status as number || 500;
+    const message = (err as Error)?.message || 'Failed to delete policy.';
 
     if (status === 401) return apiUnauthorized(message);
     if (status === 403) return apiForbidden(message);
