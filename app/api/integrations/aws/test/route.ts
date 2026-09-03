@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 5. Attempt a lightweight AWS IAM operation
-    const client = getAWSClient();
+    const client = await getAWSClient();
     const command = new ListUsersCommand({ MaxItems: 1 });
     await client.send(command);
 
@@ -41,16 +41,21 @@ export async function GET(req: NextRequest) {
     const message = error instanceof Error ? error.message : 'Unknown error occurred';
 
     // Return a safe failure without leaking AWS secrets or raw stack traces
+    const isClientAuthError = status === 401 || status === 403;
+    const isSafeAWSError = message.startsWith('AWS federation configuration error') || 
+                           message.startsWith('AWS STS') || 
+                           message.startsWith('AWS static configuration error');
+
     return NextResponse.json(
       {
         success: false,
         provider: 'aws',
         connected: false,
-        error: status === 401 || status === 403 
+        error: isClientAuthError || isSafeAWSError 
           ? message 
           : 'Failed to connect to AWS with current configuration.',
       },
-      { status }
+      { status: isClientAuthError ? status : 500 }
     );
   }
 }

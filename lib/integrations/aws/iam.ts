@@ -53,7 +53,7 @@ function normalizeRole(role: Role): AWSIdentity {
  */
 export async function discoverIAMIdentities(): Promise<AWSIAMDiscoveryResult> {
   try {
-    const client = getAWSClient();
+    const client = await getAWSClient();
     const users: AWSIdentity[] = [];
     const roles: AWSIdentity[] = [];
 

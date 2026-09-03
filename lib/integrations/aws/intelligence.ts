@@ -78,7 +78,7 @@ async function getManagedPolicyDetails(client: IAMClient, policyArn: string): Pr
 }
 
 export async function discoverUserIntelligence(userName: string): Promise<AWSSecurityIntelligence> {
-  const client = getAWSClient();
+  const client = await getAWSClient();
   const accessKeys: AWSAccessKey[] = [];
   const policies: AWSPolicy[] = [];
   const groups: string[] = [];
@@ -271,7 +271,7 @@ export async function discoverUserIntelligence(userName: string): Promise<AWSSec
 }
 
 export async function discoverRoleIntelligence(roleName: string): Promise<AWSSecurityIntelligence> {
-  const client = getAWSClient();
+  const client = await getAWSClient();
   const policies: AWSPolicy[] = [];
   const intelligenceErrors: NonNullable<AWSSecurityIntelligence['errors']> = [];
 
