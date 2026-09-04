@@ -117,3 +117,52 @@ export interface OrganizationRiskPosture {
 
   topRiskContributors: RiskTopContributor[];
 }
+
+export type SecurityPatternSeverity =
+  | 'MEDIUM'
+  | 'HIGH'
+  | 'CRITICAL';
+
+export type SecurityPatternType =
+  | 'CREDENTIAL_EXPOSURE'
+  | 'PRIVILEGE_ESCALATION'
+  | 'UNBOUNDED_EXECUTION'
+  | 'ATTACK_SURFACE';
+
+export interface SecurityPattern {
+  id: string;
+  organizationId: string;
+  patternCode: string;
+  patternType: SecurityPatternType;
+  severity: SecurityPatternSeverity;
+
+  title: string;
+  description: string;
+  recommendation: string;
+
+  subjectId: string;
+  subjectType: 'identity' | 'ai_agent' | 'resource';
+  subjectName?: string;
+
+  correlatedFindingIds: string[];
+  correlatedFindingCodes: string[];
+
+  evidence: Record<string, unknown>;
+
+  detectedAt: string;
+  fingerprint: string;
+}
+
+export interface SecurityPatternsSummary {
+  totalPatterns: number;
+  criticalPatterns: number;
+  highPatterns: number;
+  mediumPatterns: number;
+  affectedSubjects: number;
+}
+
+export interface SecurityPatternsResponse {
+  data: SecurityPattern[];
+  summary: SecurityPatternsSummary;
+  pagination: SecurityFindingsPagination;
+}
