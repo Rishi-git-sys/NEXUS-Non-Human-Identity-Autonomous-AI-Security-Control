@@ -24,7 +24,7 @@ import Link from 'next/link';
 import { formatTimestamp } from '@/lib/utils';
 
 export default function AccessGraphPage() {
-  const { user } = useAuth();
+  useAuth();
 
   const [nodes, setNodes] = useState<GraphNode[]>([]);
   const [edges, setEdges] = useState<GraphEdge[]>([]);
@@ -40,18 +40,14 @@ export default function AccessGraphPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchGraphData = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch('/api/access-graph');
       if (!res.ok) {
-        throw new Error(`Failed to fetch access graph: ${res.statusText}`);
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Failed to fetch access graph: ${res.statusText}`);
       }
       const json = await res.json();
       if (json.success && json.data) {
@@ -72,19 +68,13 @@ export default function AccessGraphPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchGraphData();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchGraphData]);
+    requestAnimationFrame(() => {
+      fetchGraphData();
+    });
+  }, [fetchGraphData]);
 
   const handleZoomIn = () => setZoom(z => Math.min(2, z + 0.1));
   const handleZoomOut = () => setZoom(z => Math.max(0.5, z - 0.1));

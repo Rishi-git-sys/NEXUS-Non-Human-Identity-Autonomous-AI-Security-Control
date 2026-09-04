@@ -38,7 +38,7 @@ function mapRowToIdentity(row: IdentityRow): Identity {
     provider: (meta.provider as string) || 'AWS',
     environment: (meta.environment as string) || 'Production',
     riskScore: typeof row.risk_score === 'number' ? row.risk_score : 0,
-    lastActive: row.last_seen_at || row.created_at,
+    lastActive: row.last_seen_at || null,
     owner: (meta.owner as string) || row.owner_id || 'SecOps Team',
     createdAt: row.created_at,
     status: mapDBStatusToUI(row.status),

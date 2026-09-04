@@ -3,7 +3,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
-import { Database } from '@/types/supabase';
 
 export interface UserProfile {
   id: string;
@@ -27,6 +26,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * In-flight deduplication map — prevents redundant concurrent fetchProfile
+ * executions for the same userId (e.g., simultaneous getSession + onAuthStateChange).
+ */
+const inFlightProfileFetches = new Map<string, Promise<UserProfile | null>>();
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -34,59 +39,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  // Helper to fetch user profile directly from public.profiles in Supabase
+  /**
+   * Fetches the current user's profile via the NEXUS server API (/api/profile).
+   * This eliminates all direct browser-to-Supabase application-table access.
+   *
+   * The supabase browser client is ONLY used for:
+   *   - supabase.auth.getSession()
+   *   - supabase.auth.onAuthStateChange()
+   *   - supabase.auth.signInWithPassword()
+   *   - supabase.auth.signUp()
+   *   - supabase.auth.signOut()
+   */
   const fetchProfile = useCallback(async (userId: string, email: string): Promise<UserProfile | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, avatar_url, role, organization_id')
-        .eq('id', userId)
-        .maybeSingle();
+    // Single-flight deduplication: reuse in-flight request for the same userId
+    const existingFlight = inFlightProfileFetches.get(userId);
+    if (existingFlight) return existingFlight;
 
-      if (error) {
-        console.error('Error fetching profile from Supabase:', error.message);
-        return null;
-      }
+    const task = (async (): Promise<UserProfile | null> => {
+      try {
+        // Validate the session token exists before calling the API
+        const { data: sessionData } = await supabase.auth.getSession();
+        const currentSession = sessionData.session;
 
-      if (data) {
-        return {
-          id: data.id,
-          email,
-          full_name: data.full_name,
-          avatar_url: data.avatar_url,
-          role: data.role,
-          organization_id: data.organization_id,
-        };
-      } else {
-        // Profile record not found (e.g. newly registered user before trigger/insert)
-        // Attempt a default profile insert if allowed by database/RLS
-        const { data: inserted, error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: userId,
-            full_name: email.split('@')[0],
-          })
-          .select('id, full_name, avatar_url, role, organization_id')
-          .single();
+        if (!currentSession?.user || !currentSession.access_token) {
+          console.warn('[NEXUS AUTH] Aborting profile fetch: no active session.');
+          return null;
+        }
 
-        if (!insertError && inserted) {
+        // All application-data access through the NEXUS server API
+        const res = await fetch('/api/profile');
+
+        if (res.status === 401) {
+          console.warn('[NEXUS AUTH] /api/profile returned 401 — session not yet propagated.');
+          return null;
+        }
+
+        if (res.status === 403) {
+          console.warn('[NEXUS AUTH] /api/profile returned 403 — user has no organization.');
+          // Return a minimal profile so the user stays authenticated
           return {
-            id: inserted.id,
+            id: userId,
             email,
-            full_name: inserted.full_name,
-            avatar_url: inserted.avatar_url,
-            role: inserted.role,
-            organization_id: inserted.organization_id,
+            full_name: currentSession.user.user_metadata?.full_name as string ?? null,
+            avatar_url: currentSession.user.user_metadata?.avatar_url as string ?? null,
+            role: 'viewer',
+            organization_id: null,
           };
         }
-        if (insertError) {
-          console.error('Error creating profile record:', insertError.message);
+
+        if (!res.ok) {
+          console.error('[NEXUS AUTH] /api/profile error:', res.status);
+          return null;
         }
+
+        const json = await res.json();
+        if (!json.success || !json.data) {
+          console.error('[NEXUS AUTH] /api/profile returned unexpected shape:', json);
+          return null;
+        }
+
+        return {
+          id: json.data.id,
+          email: json.data.email || email,
+          full_name: json.data.full_name ?? null,
+          avatar_url: json.data.avatar_url ?? null,
+          role: json.data.role ?? 'viewer',
+          organization_id: json.data.organization_id ?? null,
+        };
+      } catch (err) {
+        console.error('[NEXUS AUTH] Failed to load profile via API:', err);
+        return null;
       }
-    } catch (err) {
-      console.error('Failed to load profile:', err);
+    })();
+
+    inFlightProfileFetches.set(userId, task);
+    try {
+      return await task;
+    } finally {
+      inFlightProfileFetches.delete(userId);
     }
-    return null;
   }, []);
 
   const refreshProfile = async () => {
@@ -101,56 +132,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  /**
+   * Updates mutable profile fields (full_name, avatar_url) via NEXUS server API.
+   * No direct supabase.from('profiles') access in the browser.
+   */
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user?.id) return;
 
-    const profileUpdates: Partial<Database['public']['Tables']['profiles']['Update']> = {};
-    if (updates.full_name !== undefined) profileUpdates.full_name = updates.full_name;
-    if (updates.avatar_url !== undefined) profileUpdates.avatar_url = updates.avatar_url;
+    const patchBody: Record<string, unknown> = {};
+    if (updates.full_name !== undefined) patchBody.full_name = updates.full_name;
+    if (updates.avatar_url !== undefined) patchBody.avatar_url = updates.avatar_url;
 
-    if (Object.keys(profileUpdates).length > 0) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(profileUpdates)
-        .eq('id', user.id)
-        .select('id, full_name, avatar_url, role, organization_id')
-        .single();
+    if (Object.keys(patchBody).length > 0) {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patchBody),
+      });
 
-      if (error) {
-        console.error('Error updating profile in Supabase:', error.message);
-        throw error;
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to update profile.');
       }
 
-      if (data) {
+      const json = await res.json();
+      if (json.success && json.data) {
         setUser({
           ...user,
-          full_name: data.full_name,
-          avatar_url: data.avatar_url,
-          role: data.role,
-          organization_id: data.organization_id,
+          full_name: json.data.full_name ?? user.full_name,
+          avatar_url: json.data.avatar_url ?? user.avatar_url,
+          role: json.data.role ?? user.role,
+          organization_id: json.data.organization_id ?? user.organization_id,
           email: updates.email || user.email,
         });
         return;
       }
     }
 
+    // Email-only updates (no server profile change needed for display)
     if (updates.email && updates.email !== user.email) {
-      setUser({
-        ...user,
-        ...updates,
-      });
+      setUser({ ...user, ...updates });
     }
   };
 
   useEffect(() => {
     let mounted = true;
 
-    // Retrieve active session initially
+    // Retrieve the active Supabase session on mount
     supabase.auth.getSession().then(async ({ data: { session }, error }) => {
       if (!mounted) return;
 
       if (error) {
-        console.error('Error getting Supabase session:', error.message);
+        console.error('[NEXUS AUTH] Error getting session:', error.message);
       }
 
       if (session?.user) {
@@ -160,23 +193,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(profile);
             setIsAuthenticated(true);
           } else {
-            console.error('Valid Supabase session exists but profile could not be loaded for user:', session.user.id);
+            console.error('[NEXUS AUTH] Session exists but profile could not be loaded for user:', session.user.id);
             setUser(null);
             setIsAuthenticated(false);
           }
         }
       } else {
-        if (mounted) {
+        // No session — check for in-flight OAuth code before clearing state
+        const hasAuthParam = typeof window !== 'undefined' &&
+          (window.location.search.includes('code=') || window.location.hash.includes('access_token='));
+        if (mounted && !hasAuthParam) {
           setUser(null);
           setIsAuthenticated(false);
         }
       }
+
       if (mounted) {
-        setIsLoading(false);
+        const hasAuthParam = typeof window !== 'undefined' &&
+          (window.location.search.includes('code=') || window.location.hash.includes('access_token='));
+        if (!hasAuthParam) {
+          setIsLoading(false);
+        }
       }
     });
 
-    // Listen to changes in auth state (login, signout, token refresh)
+    // Listen for auth state changes (sign-in, sign-out, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
@@ -187,7 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setUser(profile);
             setIsAuthenticated(true);
           } else {
-            console.error('Auth state change: Session exists but profile could not be loaded.');
+            console.error('[NEXUS AUTH] Auth state change: session exists but profile could not be loaded.');
             setUser(null);
             setIsAuthenticated(false);
           }
@@ -221,7 +262,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push('/login');
       }
     } else {
-      // Authenticated users are redirected away from login / signup / forgot-password to dashboard
       if (pathname === '/login' || pathname === '/signup' || pathname === '/forgot-password') {
         router.push('/dashboard');
       } else if (pathname === '/command-center') {
@@ -260,7 +300,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { success: false, error: 'auth-error' };
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[NEXUS AUTH] Login error:', err);
       return { success: false, error: 'auth-error' };
     }
   };
@@ -271,9 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: email.trim(),
         password,
         options: {
-          data: {
-            full_name: fullName,
-          }
+          data: { full_name: fullName }
         }
       });
 
@@ -282,9 +320,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (data.user && !data.session) {
-        return { 
-          success: true, 
-          message: 'Check your email to verify your NEXUS account.' 
+        return {
+          success: true,
+          message: 'Check your email to verify your NEXUS account.'
         };
       }
 
@@ -308,7 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       await supabase.auth.signOut();
     } catch (e) {
-      console.error('Logout error:', e);
+      console.error('[NEXUS AUTH] Logout error:', e);
     } finally {
       setIsAuthenticated(false);
       setUser(null);

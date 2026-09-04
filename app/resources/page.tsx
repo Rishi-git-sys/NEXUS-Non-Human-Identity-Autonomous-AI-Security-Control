@@ -22,7 +22,7 @@ import { formatTimestamp } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 
 export default function ResourcesPage() {
-  const { user } = useAuth();
+  useAuth();
   const { showToast } = useToast();
 
   const [resources, setResources] = useState<ResourceItem[]>([]);
@@ -49,17 +49,15 @@ export default function ResourcesPage() {
   const [selectedResource, setSelectedResource] = useState<ResourceItem | null>(null);
 
   const fetchResources = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch('/api/resources');
-      if (!res.ok) throw new Error('Unable to fetch resource inventory');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Unable to fetch resource inventory');
+      }
       const json = await res.json();
       if (json.success && json.data) {
         setResources(json.data);
@@ -72,23 +70,16 @@ export default function ResourcesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchResources();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchResources]);
+    requestAnimationFrame(() => {
+      fetchResources();
+    });
+  }, [fetchResources]);
 
   const handleCreateResource = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.organization_id) return;
 
     if (!newName.trim()) {
       showToast('Resource name is required.', 'error');

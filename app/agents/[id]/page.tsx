@@ -1,7 +1,6 @@
 'use client';
 
 import { use, useState, useEffect, useCallback } from 'react';
-import { useAuth } from '@/context/AuthContext';
 import { Agent } from '@/lib/types/agent';
 import { AuditEvent } from '@/lib/types/audit';
 import { RiskBadge, StatusBadge } from '@/components/ui/Badges';
@@ -13,7 +12,6 @@ import { useToast } from '@/context/ToastContext';
 export default function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
-  const { user } = useAuth();
   const { showToast } = useToast();
 
   const [agent, setAgent] = useState<Agent | null>(null);
@@ -26,7 +24,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
-    if (!user?.organization_id || !id) {
+    if (!id) {
       setIsLoading(false);
       return;
     }
@@ -41,7 +39,8 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
       ]);
 
       if (!agentRes.ok) {
-        setError('AI Agent record not found.');
+        const errJson = await agentRes.json().catch(() => ({}));
+        setError(errJson.error || 'AI Agent record not found.');
         setAgent(null);
       } else {
         const agentJson = await agentRes.json();
@@ -68,22 +67,16 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
     } finally {
       setIsLoading(false);
     }
-  }, [user, id]);
+  }, [id]);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        loadData();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, loadData]);
+    requestAnimationFrame(() => {
+      loadData();
+    });
+  }, [loadData]);
 
   const handleFreeze = async () => {
-    if (!agent || !user?.organization_id) return;
+    if (!agent) return;
     setIsSubmitting(true);
 
     try {
@@ -112,7 +105,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const handleUnfreeze = async () => {
-    if (!agent || !user?.organization_id) return;
+    if (!agent) return;
     setIsSubmitting(true);
 
     try {
@@ -141,7 +134,7 @@ export default function AgentDetailPage({ params }: { params: Promise<{ id: stri
   };
 
   const handleRotate = async () => {
-    if (!agent || !user?.organization_id) return;
+    if (!agent) return;
     setIsSubmitting(true);
 
     try {

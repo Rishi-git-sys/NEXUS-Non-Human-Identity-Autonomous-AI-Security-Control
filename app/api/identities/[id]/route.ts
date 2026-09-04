@@ -17,24 +17,13 @@ export async function GET(
     const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
     if (!rl.success && rl.response) return rl.response;
 
-    const supabase = await createClient();
+    const identity = await identityService.getIdentityById(organizationId, id);
 
-    const { data, error } = await supabase
-      .from('identities')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      return apiError(`Failed to fetch identity: ${error.message}`, 500);
-    }
-
-    if (!data) {
+    if (!identity) {
       return apiNotFound('Identity not found.');
     }
 
-    return apiSuccess(data);
+    return apiSuccess(identity);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to fetch identity.';
@@ -155,7 +144,8 @@ export async function PATCH(
       metadata: updates as Record<string, unknown>,
     });
 
-    return apiSuccess(data);
+    const updated = await identityService.getIdentityById(organizationId, data.id);
+    return apiSuccess(updated || data);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to update identity.';

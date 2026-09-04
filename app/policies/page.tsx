@@ -8,7 +8,7 @@ import { formatTimestamp } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 
 export default function PoliciesPage() {
-  const { user } = useAuth();
+  useAuth();
   const { showToast } = useToast();
 
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -32,17 +32,15 @@ export default function PoliciesPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchPolicies = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch('/api/policies');
-      if (!res.ok) throw new Error('Unable to load security policies');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Unable to load security policies');
+      }
       const json = await res.json();
       if (json.success && json.data) {
         setPolicies(json.data);
@@ -55,24 +53,16 @@ export default function PoliciesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchPolicies();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchPolicies]);
+    requestAnimationFrame(() => {
+      fetchPolicies();
+    });
+  }, [fetchPolicies]);
 
   // Actions
   const handleToggleStatus = async (id: string, currentStatus: Policy['status']) => {
-    if (!user?.organization_id) return;
-
     const nextStatus: Policy['status'] = currentStatus === 'Active' ? 'Inactive' : 'Active';
     try {
       const res = await fetch(`/api/policies/${id}`, {
@@ -122,7 +112,6 @@ export default function PoliciesPage() {
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.organization_id) return;
 
     if (!formName.trim() || !formDescription.trim()) {
       showToast('Name and Description are required fields.', 'error');
@@ -187,7 +176,7 @@ export default function PoliciesPage() {
   };
 
   const handleDelete = async () => {
-    if (!activePolicy || !user?.organization_id) return;
+    if (!activePolicy) return;
     setIsSubmitting(true);
 
     try {

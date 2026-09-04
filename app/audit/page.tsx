@@ -9,7 +9,7 @@ import { formatTimestamp } from '@/lib/utils';
 import { useToast } from '@/context/ToastContext';
 
 export default function AuditPage() {
-  const { user } = useAuth();
+  useAuth();
   const { showToast } = useToast();
 
   const [events, setEvents] = useState<AuditEvent[]>([]);
@@ -24,19 +24,17 @@ export default function AuditPage() {
   const [selectedEvent, setSelectedEvent] = useState<AuditEvent | null>(null);
 
   const fetchEvents = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch('/api/audit');
-      if (!res.ok) throw new Error('Unable to load audit ledger telemetry');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Unable to load audit ledger telemetry');
+      }
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && Array.isArray(json.data)) {
         setEvents(json.data);
       } else {
         throw new Error(json.error || 'Unable to load audit ledger telemetry');
@@ -47,19 +45,13 @@ export default function AuditPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchEvents();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchEvents]);
+    requestAnimationFrame(() => {
+      fetchEvents();
+    });
+  }, [fetchEvents]);
 
   const handleExport = (format: 'csv' | 'json') => {
     if (events.length === 0) {

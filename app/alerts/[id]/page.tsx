@@ -18,7 +18,7 @@ export default function AlertDetailPage() {
   const router = useRouter();
   const alertId = params.id as string;
   
-  const { user } = useAuth();
+  useAuth();
   const { showToast } = useToast();
 
   const [alert, setAlert] = useState<Alert | null>(null);
@@ -27,14 +27,17 @@ export default function AlertDetailPage() {
 
   useEffect(() => {
     async function fetchAlert() {
-      if (!user?.organization_id || !alertId) {
+      if (!alertId) {
         setIsLoading(false);
         return;
       }
       try {
         const res = await fetch(`/api/alerts/${alertId}`);
-        if (!res.ok) throw new Error('Failed to fetch alert details.');
-        
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => ({}));
+          throw new Error(errJson.error || 'Failed to fetch alert details.');
+        }
+
         const json = await res.json();
         if (json.success && json.data) {
           setAlert(json.data);
@@ -49,7 +52,7 @@ export default function AlertDetailPage() {
       }
     }
     fetchAlert();
-  }, [user, alertId]);
+  }, [alertId]);
 
   const handleUpdateStatus = async (status: Alert['status']) => {
     try {

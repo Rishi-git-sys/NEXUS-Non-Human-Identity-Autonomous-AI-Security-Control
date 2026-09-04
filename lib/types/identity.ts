@@ -24,7 +24,7 @@ export interface Identity {
   provider: string;
   environment: string;
   riskScore: number;
-  lastActive: string;
+  lastActive: string | null;
   owner: string;
   createdAt: string;
   status: 'Active' | 'Inactive' | 'Disabled';

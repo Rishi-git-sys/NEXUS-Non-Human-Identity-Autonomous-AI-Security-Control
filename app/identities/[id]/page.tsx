@@ -16,6 +16,8 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
   const { user } = useAuth();
   const { showToast } = useToast();
 
+  const canMutate = user?.role === 'admin' || user?.role === 'analyst';
+
   const [identity, setIdentity] = useState<Identity | null>(null);
   const [activity, setActivity] = useState<AuditEvent[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -27,7 +29,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
 
   // Load identity and activity log data via API routes
   const loadData = useCallback(async () => {
-    if (!user?.organization_id || !id) {
+    if (!id) {
       setIsLoading(false);
       return;
     }
@@ -69,23 +71,17 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
     } finally {
       setIsLoading(false);
     }
-  }, [user, id]);
+  }, [id]);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        loadData();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, loadData]);
+    requestAnimationFrame(() => {
+      loadData();
+    });
+  }, [loadData]);
 
   // Operations connecting to authenticated API routes
   const handleDisable = async () => {
-    if (!identity || !user?.organization_id) return;
+    if (!identity) return;
     setIsSubmitting(true);
 
     try {
@@ -114,7 +110,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleEnable = async () => {
-    if (!identity || !user?.organization_id) return;
+    if (!identity) return;
     setIsSubmitting(true);
 
     try {
@@ -143,7 +139,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleRotate = async () => {
-    if (!identity || !user?.organization_id) return;
+    if (!identity) return;
     setIsSubmitting(true);
 
     try {
@@ -172,7 +168,7 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
   };
 
   const handleRevoke = async () => {
-    if (!identity || !user?.organization_id) return;
+    if (!identity) return;
     setIsSubmitting(true);
 
     try {
@@ -383,7 +379,9 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
             {identity.status === 'Disabled' ? (
               <button 
                 onClick={() => setModalType('enable')}
-                className="bg-[#10B981] hover:bg-[#0D9668] active:bg-[#0A7550] text-[#07070B] font-semibold text-xs py-2 px-3 rounded-[6px] transition-colors flex items-center justify-center gap-2 cursor-pointer h-10"
+                disabled={!canMutate || isSubmitting}
+                title={canMutate ? 'Re-Enable Identity' : 'Modifying identities requires Analyst or Admin role'}
+                className="bg-[#10B981] hover:bg-[#0D9668] active:bg-[#0A7550] text-[#07070B] font-semibold text-xs py-2 px-3 rounded-[6px] transition-colors flex items-center justify-center gap-2 cursor-pointer h-10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <UserCheck className="w-4 h-4" />
                 <span>Re-Enable Identity</span>
@@ -391,7 +389,9 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
             ) : (
               <button 
                 onClick={() => setModalType('disable')}
-                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10"
+                disabled={!canMutate || isSubmitting}
+                title={canMutate ? 'Disable Identity' : 'Modifying identities requires Analyst or Admin role'}
+                className="bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Ban className="w-4 h-4" />
                 <span>Disable Identity</span>
@@ -401,7 +401,9 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
             {/* Rotate Credentials Button */}
             <button 
               onClick={() => setModalType('rotate')}
-              className="bg-surface-top hover:bg-surface-mid border border-border text-primary-text font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10"
+              disabled={!canMutate || isSubmitting}
+              title={canMutate ? 'Rotate Credentials' : 'Modifying identities requires Analyst or Admin role'}
+              className="bg-surface-top hover:bg-surface-mid border border-border text-primary-text font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Key className="w-4 h-4 text-secondary" />
               <span>Rotate Credentials</span>
@@ -410,7 +412,9 @@ export default function IdentityDetailPage({ params }: { params: Promise<{ id: s
             {/* Revoke Access Button */}
             <button 
               onClick={() => setModalType('revoke')}
-              className="bg-surface-top hover:bg-red-500/10 hover:border-red-500/25 border border-border text-red-400 font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10"
+              disabled={!canMutate || isSubmitting}
+              title={canMutate ? 'Revoke Permissions' : 'Modifying identities requires Analyst or Admin role'}
+              className="bg-surface-top hover:bg-red-500/10 hover:border-red-500/25 border border-border text-red-400 font-semibold text-xs py-2 px-3 rounded-[6px] transition-all flex items-center justify-center gap-2 cursor-pointer h-10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Lock className="w-4 h-4 text-red-400/60" />
               <span>Revoke Permissions</span>

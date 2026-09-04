@@ -17,24 +17,13 @@ export async function GET(
     const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
     if (!rl.success && rl.response) return rl.response;
 
-    const supabase = await createClient();
+    const agent = await aiAgentService.getAIAgentById(organizationId, id);
 
-    const { data, error } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      return apiError(`Failed to fetch AI agent: ${error.message}`, 500);
-    }
-
-    if (!data) {
+    if (!agent) {
       return apiNotFound('AI agent not found.');
     }
 
-    return apiSuccess(data);
+    return apiSuccess(agent);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to fetch AI agent.';

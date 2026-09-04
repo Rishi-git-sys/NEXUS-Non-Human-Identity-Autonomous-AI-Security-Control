@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useToast } from '@/context/ToastContext';
 
 export default function AlertsPage() {
-  const { user } = useAuth();
+  useAuth();
   const { showToast } = useToast();
 
   const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -26,11 +26,6 @@ export default function AlertsPage() {
   const limit = 50;
 
   const fetchAlerts = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
@@ -45,13 +40,14 @@ export default function AlertsPage() {
       if (selectedStatus !== 'all') params.set('status', selectedStatus);
 
       const res = await fetch(`/api/alerts?${params.toString()}`);
-      
+
       if (!res.ok) {
-        throw new Error('Failed to fetch alerts');
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to fetch alerts');
       }
 
       const json = await res.json();
-      
+
       if (json.success) {
         setAlerts(json.data.data);
         setTotalPages(json.data.pagination.totalPages || 1);
@@ -64,20 +60,14 @@ export default function AlertsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, page, search, selectedSeverity, selectedStatus]);
+  }, [page, search, selectedSeverity, selectedStatus]);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      const delayDebounceFn = setTimeout(() => {
-        fetchAlerts();
-      }, 300);
-      return () => clearTimeout(delayDebounceFn);
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchAlerts]);
+    const delayDebounceFn = setTimeout(() => {
+      fetchAlerts();
+    }, 300);
+    return () => clearTimeout(delayDebounceFn);
+  }, [fetchAlerts]);
 
   const handleUpdateStatus = async (id: string, status: Alert['status']) => {
     try {

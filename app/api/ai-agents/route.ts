@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
 import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response';
-import { createClient } from '@/lib/supabase/server';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
-import { mapAgentStatusToDB } from '@/lib/services/aiAgentService';
+import { aiAgentService } from '@/lib/services/aiAgentService';
 import { enforceRateLimit } from '@/lib/security/rateLimit';
 
 export async function GET(req: NextRequest) {
@@ -12,19 +11,9 @@ export async function GET(req: NextRequest) {
     const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
     if (!rl.success && rl.response) return rl.response;
 
-    const supabase = await createClient();
+    const agents = await aiAgentService.getAIAgents(organizationId);
 
-    const { data, error } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return apiError(`Failed to fetch AI agents: ${error.message}`, 500);
-    }
-
-    return apiSuccess(data || []);
+    return apiSuccess(agents);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to fetch AI agents.';
@@ -47,32 +36,20 @@ export async function POST(req: NextRequest) {
       return apiError('AI agent name is required.', 400);
     }
 
-    const status = mapAgentStatusToDB(body.status || 'Active');
-    const riskScore = typeof body.risk_score === 'number' ? Math.max(0, Math.min(100, body.risk_score)) : 0;
-
-    const supabase = await createClient();
-
-    const record = {
-      organization_id: organizationId,
+    const res = await aiAgentService.createAIAgent(organizationId, {
       name: body.name.trim(),
-      model: body.model || 'gpt-4o',
-      provider: body.provider || 'OpenAI',
-      version: body.version || 'v1.0',
-      status: status,
-      risk_score: riskScore,
-      owner_id: user.id,
-      identity_id: body.identity_id || null,
-      metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
-    };
+      model: body.model,
+      provider: body.provider,
+      purpose: body.purpose,
+      environment: body.environment,
+      owner: body.owner,
+      identityId: body.identityId || body.identity_id || null,
+      riskScore: body.riskScore ?? body.risk_score ?? 20,
+      status: body.status || 'Active',
+    });
 
-    const { data, error } = await supabase
-      .from('ai_agents')
-      .insert(record)
-      .select()
-      .single();
-
-    if (error) {
-      return apiError(`Failed to create AI agent: ${error.message}`, 400);
+    if (!res.success || !res.agent) {
+      return apiError(res.message || 'Failed to create AI agent.', 400);
     }
 
     await writeAuditLog({
@@ -80,11 +57,11 @@ export async function POST(req: NextRequest) {
       actorId: user.id,
       action: 'agent.created',
       entityType: 'ai_agent',
-      entityId: data.id,
-      metadata: { name: data.name, model: data.model },
+      entityId: res.agent.id,
+      metadata: { name: res.agent.name, model: res.agent.model },
     });
 
-    return apiSuccess(data, 201);
+    return apiSuccess(res.agent, 201);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to create AI agent.';

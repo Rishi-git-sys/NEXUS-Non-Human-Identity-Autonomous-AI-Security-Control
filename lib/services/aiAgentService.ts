@@ -62,10 +62,10 @@ export const aiAgentService = {
   /**
    * Retrieves all AI agents for the given organization_id from Supabase PostgreSQL.
    */
-  async getAIAgents(organizationId: string): Promise<Agent[]> {
+  async getAIAgents(organizationId: string, customClient?: unknown): Promise<Agent[]> {
     if (!organizationId) return [];
 
-    const supabase = await createClient();
+    const supabase = (customClient as Awaited<ReturnType<typeof createClient>>) || await createClient();
     const { data, error } = await supabase
       .from('ai_agents')
       .select('*')
@@ -83,10 +83,10 @@ export const aiAgentService = {
   /**
    * Retrieves a single AI agent by ID for the given organization_id.
    */
-  async getAIAgentById(organizationId: string, id: string): Promise<Agent | null> {
+  async getAIAgentById(organizationId: string, id: string, customClient?: unknown): Promise<Agent | null> {
     if (!organizationId || !id) return null;
 
-    const supabase = await createClient();
+    const supabase = (customClient as Awaited<ReturnType<typeof createClient>>) || await createClient();
     const { data, error } = await supabase
       .from('ai_agents')
       .select('*')

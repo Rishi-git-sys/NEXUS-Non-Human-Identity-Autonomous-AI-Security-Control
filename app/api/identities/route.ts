@@ -3,7 +3,7 @@ import { requireAuth, requireRole } from '@/lib/auth/authorization';
 import { apiSuccess, apiError, apiUnauthorized, apiForbidden } from '@/lib/api/response';
 import { createClient } from '@/lib/supabase/server';
 import { writeAuditLog } from '@/lib/audit/auditLogger';
-import { mapUITypeToDB, mapUIStatusToDB } from '@/lib/services/identityService';
+import { identityService, mapUITypeToDB, mapUIStatusToDB } from '@/lib/services/identityService';
 import { enforceRateLimit } from '@/lib/security/rateLimit';
 
 export async function GET(req: NextRequest) {
@@ -12,17 +12,7 @@ export async function GET(req: NextRequest) {
     const rl = await enforceRateLimit(req, 'READ', { userId: user.id, organizationId });
     if (!rl.success && rl.response) return rl.response;
 
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from('identities')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      return apiError(`Failed to fetch identities: ${error.message}`, 500);
-    }
+    const data = await identityService.getIdentities(organizationId);
 
     return apiSuccess(data || []);
   } catch (err: unknown) {
@@ -82,7 +72,8 @@ export async function POST(req: NextRequest) {
       metadata: { name: data.name, identity_type: data.identity_type },
     });
 
-    return apiSuccess(data, 201);
+    const created = await identityService.getIdentityById(organizationId, data.id);
+    return apiSuccess(created || data, 201);
   } catch (err: unknown) {
     const status = (err as Record<string, unknown>)?.status as number || 500;
     const message = (err as Error)?.message || 'Failed to create identity.';

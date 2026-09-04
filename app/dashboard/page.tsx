@@ -41,11 +41,6 @@ export default function DashboardPage() {
   const [scanPhase, setScanPhase] = useState('');
 
   const loadDashboardData = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) {
       setIsLoading(true);
     }
@@ -54,7 +49,14 @@ export default function DashboardPage() {
     try {
       const res = await fetch(`/api/dashboard?timeframe=${timeframe}`);
       if (!res.ok) {
-        throw new Error(`Failed to load dashboard: ${res.statusText}`);
+        const errJson = await res.json().catch(() => ({}));
+        if (res.status === 401) {
+          throw new Error('Your session has expired or is unauthenticated. Please re-authenticate.');
+        } else if (res.status === 403) {
+          throw new Error(errJson.error || 'Authorization error: User does not belong to a valid organization.');
+        } else {
+          throw new Error(errJson.error || `Control plane service error (${res.status}). Please retry.`);
+        }
       }
       const json = await res.json();
       if (json.success && json.data) {
@@ -64,26 +66,21 @@ export default function DashboardPage() {
       }
     } catch (err: unknown) {
       console.error('Failed to load dashboard telemetry:', err);
-      setError('Unable to load security telemetry from control plane. Please verify connection and retry.');
+      const msg = (err as Error)?.message || 'Unable to load security telemetry from control plane. Please verify connection and retry.';
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
-  }, [user, timeframe]);
+  }, [timeframe]);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        loadDashboardData();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, timeframe, loadDashboardData]);
+    requestAnimationFrame(() => {
+      loadDashboardData();
+    });
+  }, [timeframe, loadDashboardData]);
 
   const handleScan = async () => {
-    if (scanState === 'scanning' || !user?.organization_id) return;
+    if (scanState === 'scanning') return;
     
     setScanState('scanning');
     setScanProgress(0);

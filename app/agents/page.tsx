@@ -40,16 +40,11 @@ export default function AIAgentsPage() {
   const [newProvider, setNewProvider] = useState('OpenAI');
   const [newPurpose, setNewPurpose] = useState('');
   const [newEnv, setNewEnv] = useState('Production');
-  const [newOwner, setNewOwner] = useState('SecOps Team');
+  const [newOwner, setNewOwner] = useState(user?.full_name || 'SecOps Team');
   const [newIdentityId, setNewIdentityId] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchAgents = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
@@ -59,41 +54,39 @@ export default function AIAgentsPage() {
         fetch('/api/identities'),
       ]);
 
-      if (!agentsRes.ok) throw new Error('Failed to fetch AI agents');
+      if (!agentsRes.ok) {
+        const errJson = await agentsRes.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Failed to fetch AI agents');
+      }
       const agentsJson = await agentsRes.json();
-      if (agentsJson.success && agentsJson.data) {
+      if (agentsJson.success && Array.isArray(agentsJson.data)) {
         setAgents(agentsJson.data);
+      } else {
+        setAgents([]);
       }
 
       if (identitiesRes.ok) {
         const identitiesJson = await identitiesRes.json();
-        if (identitiesJson.success && identitiesJson.data) {
+        if (identitiesJson.success && Array.isArray(identitiesJson.data)) {
           setIdentities(identitiesJson.data);
         }
       }
     } catch (err: unknown) {
       console.error('Error fetching AI agents:', err);
-      setError('Unable to fetch AI agent telemetry from control plane. Please try again.');
+      setError((err as Error)?.message || 'Unable to fetch AI agent telemetry from control plane. Please try again.');
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchAgents();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchAgents]);
+    requestAnimationFrame(() => {
+      fetchAgents();
+    });
+  }, [fetchAgents]);
 
   const handleRegisterAgent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.organization_id) return;
 
     if (!newName.trim()) {
       showToast('Agent name is required.', 'error');

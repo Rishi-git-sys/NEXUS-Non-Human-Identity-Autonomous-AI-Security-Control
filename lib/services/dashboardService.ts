@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Database } from '@/types/supabase';
 import { isAWSIAMIdentity } from '@/lib/integrations/aws/utils';
 import { RiskTrendPoint } from '@/lib/types/risk';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 type IdentityRow = Database['public']['Tables']['identities']['Row'];
 type AIAgentRow = Database['public']['Tables']['ai_agents']['Row'];
@@ -19,13 +20,17 @@ export const dashboardService = {
    * Retrieves dashboard telemetry from Supabase PostgreSQL tables.
    * Every query is explicitly scoped to the user's organization_id.
    */
-  async getDashboardData(organizationId: string, timeframe: '7d' | '30d' | '90d' = '7d'): Promise<DashboardData> {
+  async getDashboardData(
+    organizationId: string,
+    timeframe: '7d' | '30d' | '90d' = '7d',
+    customClient?: SupabaseClient<Database>
+  ): Promise<DashboardData> {
     if (!organizationId) {
       throw new Error('Organization ID is required to fetch dashboard telemetry.');
     }
 
     // Execute queries in parallel scoped to the target organization
-    const supabase = await createClient();
+    const supabase = customClient || await createClient();
     const [
       orgRes,
       identitiesRes,

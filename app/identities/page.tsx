@@ -20,7 +20,8 @@ import {
   RefreshCw, 
   AlertCircle,
   X,
-  Cloud
+  Cloud,
+  Lock
 } from 'lucide-react';
 import Link from 'next/link';
 import { formatTimestamp } from '@/lib/utils';
@@ -29,6 +30,9 @@ import { useToast } from '@/context/ToastContext';
 export default function IdentitiesPage() {
   const { user } = useAuth();
   const { showToast } = useToast();
+
+  const isAdmin = user?.role === 'admin';
+  const canManageIdentities = user?.role === 'admin' || user?.role === 'analyst';
 
   const [identities, setIdentities] = useState<Identity[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -54,19 +58,17 @@ export default function IdentitiesPage() {
   const [isSyncing, setIsSyncing] = useState(false);
 
   const fetchIdentities = useCallback(async (isRefresh = false) => {
-    if (!user?.organization_id) {
-      setIsLoading(false);
-      return;
-    }
-
     if (!isRefresh) setIsLoading(true);
     setError(null);
 
     try {
       const res = await fetch('/api/identities');
-      if (!res.ok) throw new Error('Unable to fetch identity catalog');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Unable to fetch identity catalog');
+      }
       const json = await res.json();
-      if (json.success && json.data) {
+      if (json.success && Array.isArray(json.data)) {
         setIdentities(json.data);
       } else {
         throw new Error(json.error || 'Unable to fetch identity catalog');
@@ -77,19 +79,13 @@ export default function IdentitiesPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
-    if (user?.organization_id) {
-      requestAnimationFrame(() => {
-        fetchIdentities();
-      });
-    } else if (!user) {
-      requestAnimationFrame(() => {
-        setIsLoading(false);
-      });
-    }
-  }, [user, fetchIdentities]);
+    requestAnimationFrame(() => {
+      fetchIdentities();
+    });
+  }, [fetchIdentities]);
 
   const handleSort = (field: 'name' | 'riskScore' | 'lastActive') => {
     if (sortBy === field) {
@@ -101,7 +97,11 @@ export default function IdentitiesPage() {
 
   const handleCreateIdentity = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.organization_id) return;
+
+    if (!canManageIdentities) {
+      showToast('Creating identities requires Analyst or Admin role.', 'error');
+      return;
+    }
 
     if (!newIdentityName.trim()) {
       showToast('Identity name is required.', 'error');
@@ -155,6 +155,10 @@ export default function IdentitiesPage() {
   };
 
   const handleSyncAWS = async () => {
+    if (!isAdmin) {
+      showToast('AWS IAM synchronization requires Administrator privileges.', 'error');
+      return;
+    }
     if (isSyncing) return;
     setIsSyncing(true);
     try {
@@ -233,7 +237,11 @@ export default function IdentitiesPage() {
         return a.name.localeCompare(b.name) * multiplier;
       }
       if (sortBy === 'lastActive') {
-        return (new Date(a.lastActive).getTime() - new Date(b.lastActive).getTime()) * multiplier;
+        const timeA = a.lastActive ? new Date(a.lastActive).getTime() : 0;
+        const timeB = b.lastActive ? new Date(b.lastActive).getTime() : 0;
+        const validTimeA = Number.isNaN(timeA) ? 0 : timeA;
+        const validTimeB = Number.isNaN(timeB) ? 0 : timeB;
+        return (validTimeA - validTimeB) * multiplier;
       }
       return (a.riskScore - b.riskScore) * multiplier;
     });
@@ -268,21 +276,40 @@ export default function IdentitiesPage() {
 
           <button
             onClick={handleSyncAWS}
-            disabled={isSyncing || isLoading}
-            className="bg-surface hover:bg-surface-top border border-border text-secondary hover:text-white font-semibold text-xs px-3.5 py-2 rounded-[6px] transition-colors flex items-center gap-1.5 cursor-pointer h-9 disabled:opacity-50"
-            title="Sync AWS IAM Identities"
+            disabled={!isAdmin || isSyncing || isLoading}
+            className={`border border-border text-xs px-3.5 py-2 rounded-[6px] transition-colors flex items-center gap-1.5 h-9 ${
+              isAdmin 
+                ? 'bg-surface hover:bg-surface-top text-secondary hover:text-white font-semibold cursor-pointer disabled:opacity-50' 
+                : 'bg-surface/50 text-muted/60 cursor-not-allowed border-dashed opacity-60'
+            }`}
+            title={
+              isAdmin 
+                ? 'Sync AWS IAM Identities' 
+                : `AWS IAM synchronization requires Administrator privileges (Current role: ${user?.role || 'viewer'})`
+            }
           >
-            {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Cloud className="w-4 h-4" />}
+            {isSyncing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : !isAdmin ? (
+              <Lock className="w-3.5 h-3.5 text-muted" />
+            ) : (
+              <Cloud className="w-4 h-4" />
+            )}
             <span className="hidden sm:inline">Sync AWS IAM</span>
+            {!isAdmin && (
+              <span className="hidden md:inline text-[9px] bg-surface-mid px-1.5 py-0.5 rounded text-muted font-mono">Admin Only</span>
+            )}
           </button>
 
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs px-3.5 py-2 rounded-[6px] transition-colors flex items-center gap-1.5 cursor-pointer h-9"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Identity</span>
-          </button>
+          {canManageIdentities && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-semibold text-xs px-3.5 py-2 rounded-[6px] transition-colors flex items-center gap-1.5 cursor-pointer h-9"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Identity</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -520,7 +547,7 @@ export default function IdentitiesPage() {
                     </div>
 
                     <div className="flex justify-between items-center pt-1 border-t border-border/60 gap-3 w-full">
-                      <span className="text-[10px] text-muted truncate">{new Date(id.lastActive).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-muted truncate">{formatTimestamp(id.lastActive)}</span>
                       <div className="flex items-center gap-2 shrink-0">
                         <StatusBadge status={id.status} />
                         <ChevronRight className="w-3.5 h-3.5 text-muted" />
