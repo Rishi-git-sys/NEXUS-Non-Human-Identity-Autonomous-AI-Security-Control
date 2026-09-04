@@ -60,3 +60,60 @@ export interface SecurityFindingsResponse {
   data: SecurityFinding[];
   pagination: SecurityFindingsPagination;
 }
+
+export interface RiskSeverityCounts {
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+}
+
+export interface RiskCategoryBreakdown {
+  count: number;
+  riskContribution: number;
+  criticalCount: number;
+  highCount: number;
+}
+
+export interface RiskSubjectBreakdown {
+  total: number;
+  atRisk: number;
+  averageRiskScore: number;
+  findingsCount: number;
+}
+
+export interface RiskTopContributor {
+  findingId: string;
+  code: string;
+  category: SecurityFindingCategory;
+  severity: SecurityFindingSeverity;
+  subjectId: string;
+  subjectType: 'identity' | 'ai_agent' | 'resource';
+  subjectName?: string;
+  title: string;
+  riskContribution: number;
+  recommendation: string;
+}
+
+export interface OrganizationRiskPosture {
+  overallScore: number;
+  severity: SecurityFindingSeverity;
+  status: 'Healthy' | 'Medium Risk' | 'High Risk' | 'Critical';
+  assessedAt: string;
+
+  totalFindings: number;
+
+  severityCounts: RiskSeverityCounts;
+
+  categoryBreakdown: Record<
+    SecurityFindingCategory,
+    RiskCategoryBreakdown
+  >;
+
+  subjectBreakdown: {
+    identities: RiskSubjectBreakdown;
+    aiAgents: RiskSubjectBreakdown;
+  };
+
+  topRiskContributors: RiskTopContributor[];
+}
