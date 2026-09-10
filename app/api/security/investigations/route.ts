@@ -147,6 +147,13 @@ export interface ValidationFailure {
 
 export type ValidationOutcome = ValidationSuccess | ValidationFailure;
 
+const MAX_ID_LENGTH = 256;
+const CONTROL_CHAR_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
+
+function containsControlChars(str: string): boolean {
+  return CONTROL_CHAR_REGEX.test(str);
+}
+
 export function validateInvestigationRequestBody(body: unknown): ValidationOutcome {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return {
@@ -158,9 +165,22 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
 
   const record = body as Record<string, unknown>;
 
-  // Check prohibited client fields
+  // Check prohibited prototype pollution keys (own properties only)
+  if (
+    Object.prototype.hasOwnProperty.call(record, '__proto__') ||
+    Object.prototype.hasOwnProperty.call(record, 'constructor') ||
+    Object.prototype.hasOwnProperty.call(record, 'prototype')
+  ) {
+    return {
+      valid: false,
+      code: 'INVALID_REQUEST',
+      message: 'Request payload contains prohibited prototype keys.',
+    };
+  }
+
+  // Check prohibited client fields first
   for (const field of PROHIBITED_CLIENT_FIELDS) {
-    if (field in record && record[field] !== undefined) {
+    if (Object.prototype.hasOwnProperty.call(record, field) && record[field] !== undefined) {
       return {
         valid: false,
         code: 'INVALID_REQUEST',
@@ -179,6 +199,14 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
     };
   }
 
+  if (containsControlChars(rawTargetType)) {
+    return {
+      valid: false,
+      code: 'INVALID_REQUEST',
+      message: 'Field "targetType" contains prohibited control characters.',
+    };
+  }
+
   const targetType = rawTargetType.trim() as InvestigationTargetType;
   if (!VALID_TARGET_TYPES.has(targetType)) {
     return {
@@ -186,6 +214,27 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
       code: 'INVALID_TARGET',
       message: `Unsupported targetType: "${rawTargetType}". Allowed target types: ${Array.from(VALID_TARGET_TYPES).join(', ')}.`,
     };
+  }
+
+  // Check for unknown arbitrary fields
+  const allowedKeys = new Set([
+    'targetType',
+    'findingIds',
+    'patternIds',
+    'subjectType',
+    'subjectId',
+    'includeRiskPosture',
+    'analystQuestion',
+  ]);
+
+  for (const key of Object.keys(record)) {
+    if (!allowedKeys.has(key)) {
+      return {
+        valid: false,
+        code: 'INVALID_REQUEST',
+        message: `Unrecognized request field "${key}". Arbitrary fields are not permitted.`,
+      };
+    }
   }
 
   // Validate optional analystQuestion
@@ -198,7 +247,21 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
         message: 'Field "analystQuestion" must be a string if provided.',
       };
     }
+    if (containsControlChars(record.analystQuestion)) {
+      return {
+        valid: false,
+        code: 'INVALID_REQUEST',
+        message: 'Field "analystQuestion" contains prohibited control characters.',
+      };
+    }
     const trimmed = record.analystQuestion.trim();
+    if (trimmed.length === 0) {
+      return {
+        valid: false,
+        code: 'INVALID_REQUEST',
+        message: 'Field "analystQuestion" must not be empty or whitespace-only if provided.',
+      };
+    }
     if (trimmed.length > INVESTIGATION_LIMITS.maxAnalystQuestionLength) {
       return {
         valid: false,
@@ -206,9 +269,7 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
         message: `Field "analystQuestion" exceeds maximum allowed length of ${INVESTIGATION_LIMITS.maxAnalystQuestionLength} characters.`,
       };
     }
-    if (trimmed.length > 0) {
-      analystQuestion = trimmed;
-    }
+    analystQuestion = trimmed;
   }
 
   // Validate optional includeRiskPosture
@@ -222,6 +283,46 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
       };
     }
     includeRiskPosture = record.includeRiskPosture;
+  }
+
+  // Reject extra/mismatched selector fields based on targetType
+  if (targetType === 'finding') {
+    if (record.patternIds !== undefined || record.subjectType !== undefined || record.subjectId !== undefined) {
+      return {
+        valid: false,
+        code: 'INVALID_SELECTOR',
+        message: 'Extra selector fields (patternIds, subjectType, subjectId) are not permitted for targetType "finding".',
+      };
+    }
+  } else if (targetType === 'pattern') {
+    if (record.findingIds !== undefined || record.subjectType !== undefined || record.subjectId !== undefined) {
+      return {
+        valid: false,
+        code: 'INVALID_SELECTOR',
+        message: 'Extra selector fields (findingIds, subjectType, subjectId) are not permitted for targetType "pattern".',
+      };
+    }
+  } else if (targetType === 'subject') {
+    if (record.findingIds !== undefined || record.patternIds !== undefined) {
+      return {
+        valid: false,
+        code: 'INVALID_SELECTOR',
+        message: 'Extra selector fields (findingIds, patternIds) are not permitted for targetType "subject".',
+      };
+    }
+  } else if (targetType === 'posture') {
+    if (
+      record.findingIds !== undefined ||
+      record.patternIds !== undefined ||
+      record.subjectType !== undefined ||
+      record.subjectId !== undefined
+    ) {
+      return {
+        valid: false,
+        code: 'INVALID_SELECTOR',
+        message: 'Extra selector fields are not permitted for targetType "posture".',
+      };
+    }
   }
 
   // Target-specific selector validation
@@ -247,6 +348,7 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
       };
     }
     const sanitizedIds: string[] = [];
+    const seenFindingIds = new Set<string>();
     for (const item of record.findingIds) {
       if (typeof item !== 'string' || item.trim().length === 0) {
         return {
@@ -255,7 +357,30 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
           message: 'All items in "findingIds" must be non-empty strings.',
         };
       }
-      sanitizedIds.push(item.trim());
+      if (containsControlChars(item)) {
+        return {
+          valid: false,
+          code: 'INVALID_REQUEST',
+          message: 'Item in "findingIds" contains prohibited control characters.',
+        };
+      }
+      const trimmed = item.trim();
+      if (trimmed.length > MAX_ID_LENGTH) {
+        return {
+          valid: false,
+          code: 'BOUNDS_VIOLATION',
+          message: `Finding ID exceeds maximum allowed length of ${MAX_ID_LENGTH} characters.`,
+        };
+      }
+      if (seenFindingIds.has(trimmed)) {
+        return {
+          valid: false,
+          code: 'INVALID_SELECTOR',
+          message: `Duplicate selector "${trimmed}" detected in findingIds.`,
+        };
+      }
+      seenFindingIds.add(trimmed);
+      sanitizedIds.push(trimmed);
     }
     findingIds = sanitizedIds;
   }
@@ -277,6 +402,7 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
       };
     }
     const sanitizedIds: string[] = [];
+    const seenPatternIds = new Set<string>();
     for (const item of record.patternIds) {
       if (typeof item !== 'string' || item.trim().length === 0) {
         return {
@@ -285,7 +411,30 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
           message: 'All items in "patternIds" must be non-empty strings.',
         };
       }
-      sanitizedIds.push(item.trim());
+      if (containsControlChars(item)) {
+        return {
+          valid: false,
+          code: 'INVALID_REQUEST',
+          message: 'Item in "patternIds" contains prohibited control characters.',
+        };
+      }
+      const trimmed = item.trim();
+      if (trimmed.length > MAX_ID_LENGTH) {
+        return {
+          valid: false,
+          code: 'BOUNDS_VIOLATION',
+          message: `Pattern ID exceeds maximum allowed length of ${MAX_ID_LENGTH} characters.`,
+        };
+      }
+      if (seenPatternIds.has(trimmed)) {
+        return {
+          valid: false,
+          code: 'INVALID_SELECTOR',
+          message: `Duplicate selector "${trimmed}" detected in patternIds.`,
+        };
+      }
+      seenPatternIds.add(trimmed);
+      sanitizedIds.push(trimmed);
     }
     patternIds = sanitizedIds;
   }
@@ -316,6 +465,13 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
         message: 'Field "subjectType" is required for a subject investigation.',
       };
     }
+    if (containsControlChars(rawSubjectType)) {
+      return {
+        valid: false,
+        code: 'INVALID_REQUEST',
+        message: 'Field "subjectType" contains prohibited control characters.',
+      };
+    }
     const normalizedSubjectType = rawSubjectType.trim().toLowerCase() as InvestigationSubjectType;
     if (!VALID_SUBJECT_TYPES.has(normalizedSubjectType)) {
       return {
@@ -334,28 +490,22 @@ export function validateInvestigationRequestBody(body: unknown): ValidationOutco
         message: 'Field "subjectId" is required and must be a non-empty string for a subject investigation.',
       };
     }
-    subjectId = rawSubjectId.trim();
-  }
-
-  // Check for unknown arbitrary nested objects or non-primitive fields
-  const allowedKeys = new Set([
-    'targetType',
-    'findingIds',
-    'patternIds',
-    'subjectType',
-    'subjectId',
-    'includeRiskPosture',
-    'analystQuestion',
-  ]);
-
-  for (const key of Object.keys(record)) {
-    if (!allowedKeys.has(key)) {
+    if (containsControlChars(rawSubjectId)) {
       return {
         valid: false,
         code: 'INVALID_REQUEST',
-        message: `Unrecognized request field "${key}". Arbitrary fields are not permitted.`,
+        message: 'Field "subjectId" contains prohibited control characters.',
       };
     }
+    const trimmedSubjectId = rawSubjectId.trim();
+    if (trimmedSubjectId.length > MAX_ID_LENGTH) {
+      return {
+        valid: false,
+        code: 'BOUNDS_VIOLATION',
+        message: `Field "subjectId" exceeds maximum allowed length of ${MAX_ID_LENGTH} characters.`,
+      };
+    }
+    subjectId = trimmedSubjectId;
   }
 
   const validatedRequest: InvestigationRequest = {
@@ -471,6 +621,26 @@ export async function handleInvestigationRequest(
     }
 
     // 3. Parse and Validate Request JSON manually
+    const contentLength = req.headers.get('content-length');
+    if (contentLength) {
+      const parsedLength = parseInt(contentLength, 10);
+      if (Number.isFinite(parsedLength) && parsedLength > 65_536) {
+        logSafeApiMetrics({
+          type: 'INVESTIGATION_API_REQUEST',
+          organizationId: authoritativeOrgId,
+          durationMs: Date.now() - startTime,
+          statusCode: 400,
+          success: false,
+          category: 'BOUNDS_VIOLATION',
+        });
+        return errorResponse(
+          'BOUNDS_VIOLATION',
+          'Request payload exceeds maximum allowed size of 64 KB.',
+          400
+        );
+      }
+    }
+
     let rawBody: unknown;
     try {
       rawBody = await req.json();

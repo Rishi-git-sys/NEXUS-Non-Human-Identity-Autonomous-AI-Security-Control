@@ -98,6 +98,7 @@ export function logSafeProviderMetrics(metrics: SafeLogPayload): void {
 
 const PROHIBITED_SECRET_PATTERNS: readonly RegExp[] = [
   /\bAKIA[0-9A-Z]{16}\b/,
+  /\bASIA[0-9A-Z]{16}\b/,
   /-----BEGIN[ A-Z0-9_-]*PRIVATE KEY-----/i,
   /bearer\s+[a-zA-Z0-9_.-]{20,}/i,
   /eyJ[a-zA-Z0-9_-]{10,}\.eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/,
@@ -106,6 +107,8 @@ const PROHIBITED_SECRET_PATTERNS: readonly RegExp[] = [
   /\bpassword\s*[:=]\s*[^\s]+/i,
   /\bauthorization\s*[:=]\s*[^\s]+/i,
   /\bclient_secret\s*[:=]\s*[^\s]+/i,
+  /\baws_secret_access_key\s*[:=]\s*[^\s]+/i,
+  /\bsupabase(?:[._-])?(?:service|anon|publishable)?(?:[._-])?key/i,
 ];
 
 function containsSecret(text: string): boolean {

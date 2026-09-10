@@ -128,12 +128,19 @@ export interface ChatMessage {
   readonly content: string;
 }
 
+export function escapeTagBreakout(text: string): string {
+  return text
+    .replace(/<\/UNTRUSTED_ANALYST_QUESTION>/gi, '&lt;/UNTRUSTED_ANALYST_QUESTION&gt;')
+    .replace(/<\/UNTRUSTED_INVESTIGATION_CONTEXT>/gi, '&lt;/UNTRUSTED_INVESTIGATION_CONTEXT&gt;');
+}
+
 export function buildInvestigationMessages(
   request: InvestigationProviderRequest
 ): readonly ChatMessage[] {
-  const contextJson = JSON.stringify(request.context, null, 2);
+  const contextJson = escapeTagBreakout(JSON.stringify(request.context, null, 2));
 
-  const analystQuestion = request.analystQuestion?.trim() || request.context.analystQuestion?.trim();
+  const rawQuestion = request.analystQuestion?.trim() || request.context.analystQuestion?.trim();
+  const analystQuestion = rawQuestion ? escapeTagBreakout(rawQuestion) : undefined;
 
   let userContent = `<UNTRUSTED_INVESTIGATION_CONTEXT>\n${contextJson}\n</UNTRUSTED_INVESTIGATION_CONTEXT>`;
 
