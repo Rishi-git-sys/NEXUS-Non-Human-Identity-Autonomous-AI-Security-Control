@@ -3,10 +3,8 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
 
 export function FinalCTA() {
-  const { showToast } = useToast();
 
   return (
     <section id="cta" className="w-full bg-[#080B10] landing-section-border">
@@ -63,12 +61,12 @@ export function FinalCTA() {
               Enter Control Center
               <ArrowRight className="w-4 h-4" />
             </Link>
-            <button
-              onClick={() => showToast('Access request received. Our team will reach out shortly.', 'success')}
+            <Link
+              href="/signup"
               className="inline-flex items-center justify-center gap-2 bg-[#0F1115] border border-[#1C2027] text-[#E7E9EE] hover:border-[#5EEAD4]/35 hover:text-white font-semibold text-sm px-8 py-3.5 rounded transition-colors cursor-pointer focus:outline-none"
             >
               Request Access
-            </button>
+            </Link>
           </div>
 
           {/* Divider */}

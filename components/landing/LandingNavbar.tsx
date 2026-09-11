@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Shield, Menu, X } from 'lucide-react';
-import { useToast } from '@/context/ToastContext';
 
 const NAV_LINKS = [
   { label: 'Platform', href: '#platform' },
@@ -22,7 +21,6 @@ function scrollToSection(href: string) {
 }
 
 export function LandingNavbar() {
-  const { showToast } = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -66,12 +64,12 @@ export function LandingNavbar() {
             >
               Sign In
             </Link>
-            <button
-              onClick={() => showToast('Access request received. Our team will be in touch.', 'success')}
+            <Link
+              href="/signup"
               className="bg-[#5EEAD4] text-[#06070A] font-semibold text-xs px-4 py-1.5 rounded hover:bg-white transition-colors cursor-pointer focus:outline-none"
             >
               Request Access
-            </button>
+            </Link>
 
             {/* Mobile hamburger */}
             <button

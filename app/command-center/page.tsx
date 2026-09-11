@@ -344,7 +344,7 @@ export default function CommandCenterPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* KPI: Risk Score */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Risk Score</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className={`text-2xl font-bold tracking-tight truncate shrink ${riskScoreColor(riskPosture.overallScore)}`}>
@@ -358,7 +358,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* KPI: Status */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Posture Status</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">
@@ -368,7 +368,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* KPI: Total Findings */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Total Findings</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">
@@ -387,7 +387,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* KPI: Correlated Patterns */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Correlated Patterns</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">

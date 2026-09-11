@@ -144,48 +144,48 @@ export default function SettingsPage() {
         <div className="w-full lg:w-60 bg-surface border border-border rounded-[12px] p-2 shrink-0 flex flex-row lg:flex-col overflow-x-auto lg:overflow-x-visible gap-1 select-none">
           <button
             onClick={() => setActiveTab('profile')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'profile' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'profile' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             My Profile
           </button>
           <button
             onClick={() => setActiveTab('org')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'org' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'org' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             Organization Profile
           </button>
           <button
             onClick={() => setActiveTab('security')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'security' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'security' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             Security Controls
           </button>
           <button
             onClick={() => setActiveTab('notifications')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'notifications' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'notifications' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             Notification Dispatch
           </button>
           <button
             onClick={() => setActiveTab('appearance')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'appearance' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'appearance' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             Console Appearance
           </button>
           <button
             onClick={() => setActiveTab('integrations')}
-            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-colors whitespace-nowrap cursor-pointer ${
-              activeTab === 'integrations' ? 'bg-surface-top text-white border-l-2 border-purple-500' : 'text-secondary hover:bg-surface-top/40'
+            className={`text-xs font-semibold px-4 py-2.5 rounded-[6px] text-left transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'integrations' ? 'bg-purple-500/10 text-white border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.1)]' : 'text-secondary hover:bg-surface-top/40 hover:text-white'
             }`}
           >
             Cloud Integrations

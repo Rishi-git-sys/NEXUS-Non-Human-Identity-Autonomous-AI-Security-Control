@@ -315,19 +315,19 @@ export default function IdentitiesPage() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Total Identities</span>
           <span className="text-xl font-bold text-white tracking-tight mt-2">{totalCount}</span>
         </div>
-        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">High Risk Assets</span>
           <span className="text-xl font-bold text-critical-text tracking-tight mt-2">{highRiskCount}</span>
         </div>
-        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Unreviewed Keys</span>
           <span className="text-xl font-bold text-warning-text tracking-tight mt-2">{unreviewedCount}</span>
         </div>
-        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-4 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Privileged Scopes</span>
           <span className="text-xl font-bold text-purple-400 tracking-tight mt-2">{privilegedCount}</span>
         </div>

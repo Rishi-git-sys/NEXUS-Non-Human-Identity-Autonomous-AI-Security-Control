@@ -434,3 +434,36 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+/* ─────────────────────────────────────────
+   ENTERPRISE SOC CARD UTILITIES
+───────────────────────────────────────── */
+.nexus-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.nexus-card:hover {
+  border-color: rgba(139, 92, 246, 0.25);
+}
+
+.nexus-card-glow {
+  box-shadow: 0 0 20px -5px rgba(99, 102, 241, 0.12);
+}
+
+/* ─────────────────────────────────────────
+   ACCESSIBILITY: REDUCED MOTION
+───────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+

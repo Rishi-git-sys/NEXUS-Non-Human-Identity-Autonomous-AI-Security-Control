@@ -252,7 +252,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* KPI 1: Security Score */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Security Score</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">
@@ -274,7 +274,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI 2: Identity Risk */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Identity Risk</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">{identityRiskCount}</span>
@@ -293,7 +293,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI 3: AI Agent Risk */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">AI Agent Risk</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">{agentRiskCount}</span>
@@ -312,7 +312,7 @@ export default function DashboardPage() {
         </div>
 
         {/* KPI 4: Policy Compliance */}
-        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-border/80 transition-colors">
+        <div className="bg-surface border border-border rounded-[12px] p-5 flex flex-col justify-between hover:border-purple-500/30 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.1)] transition-all duration-200">
           <span className="text-muted text-[10px] font-bold uppercase tracking-wider block">Policy Compliance</span>
           <div className="mt-4 flex items-baseline justify-between gap-3 w-full min-w-0">
             <span className="text-2xl font-bold text-white tracking-tight truncate shrink">

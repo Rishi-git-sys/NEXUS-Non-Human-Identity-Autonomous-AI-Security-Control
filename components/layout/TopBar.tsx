@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, Search, Bell, Shield, User, Settings, LogOut, CheckCircle } from 'lucide-react';
+import { Menu, Search, Bell, Shield, User, Settings, LogOut } from 'lucide-react';
 import { useNavigation } from '@/context/NavigationContext';
 import { useAuth } from '@/context/AuthContext';
 
@@ -53,8 +53,11 @@ export default function TopBar() {
   }, []);
 
   const getPageInfo = () => {
+    if (pathname === '/command-center') {
+      return { category: 'INTELLIGENCE', title: 'Command Center' };
+    }
     if (pathname === '/dashboard' || pathname === '/') {
-      return { category: 'OVERVIEW', title: 'Command Center' };
+      return { category: 'OVERVIEW', title: 'Operational Dashboard' };
     }
     if (pathname?.startsWith('/identities')) {
       return { category: 'IDENTITY', title: 'Identities' };
@@ -125,10 +128,13 @@ export default function TopBar() {
       {/* Right side Actions */}
       <div className="flex items-center space-x-3 md:space-x-5" ref={dropdownRef}>
         
-        {/* Security status indicator indicator */}
-        <div className="hidden lg:flex items-center gap-1.5 bg-healthy-bg border border-healthy-border text-healthy-text px-2.5 py-1 rounded-[6px] text-[10px] font-semibold">
-          <CheckCircle className="w-3.5 h-3.5" />
-          <span>PLANE SECURITY COMPLIANT</span>
+        {/* Security status indicator */}
+        <div className="hidden lg:flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-[6px] text-[10px] font-semibold tracking-wider uppercase">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+          </span>
+          <span>PLANE COMPLIANT</span>
         </div>
 
         {/* Search Input */}

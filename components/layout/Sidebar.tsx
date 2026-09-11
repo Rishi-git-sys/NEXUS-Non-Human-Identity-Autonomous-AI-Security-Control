@@ -127,7 +127,7 @@ export default function Sidebar() {
         )}
         
         {group.items.map((item) => {
-          const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname?.startsWith(item.href.split('?')[0]));
+          const isActive = pathname === item.href || (item.href !== '/dashboard' && item.href !== '/command-center' && pathname?.startsWith(item.href.split('?')[0]));
           const badgeCount = item.dynamicBadge ? activeAlertsCount : 0;
 
           return (
@@ -137,8 +137,8 @@ export default function Sidebar() {
                 onClick={closeSidebar}
                 className={`flex items-center justify-between px-3 py-2 rounded-[6px] transition-all duration-150 relative ${
                   isActive 
-                    ? 'bg-surface-top text-white font-medium border-l-2 border-purple-500' 
-                    : 'text-secondary hover:text-white hover:bg-surface'
+                    ? 'bg-purple-500/10 text-white font-semibold border-l-2 border-purple-500 shadow-[inset_0_0_12px_rgba(139,92,246,0.12)]' 
+                    : 'text-secondary hover:text-white hover:bg-surface/80'
                 }`}
               >
                 <div className="flex items-center">

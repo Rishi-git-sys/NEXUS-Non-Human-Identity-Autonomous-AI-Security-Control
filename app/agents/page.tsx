@@ -278,7 +278,7 @@ export default function AIAgentsPage() {
             </div>
           ) : (
             filteredAgents.map((agent) => (
-              <div key={agent.id} className="bg-surface border border-border hover:border-border/80 rounded-[12px] p-5 flex flex-col justify-between space-y-4 hover:shadow-xl transition-all duration-200 animate-slide-up">
+              <div key={agent.id} className="bg-surface border border-border hover:border-purple-500/30 rounded-[12px] p-5 flex flex-col justify-between space-y-4 hover:shadow-[0_4px_20px_-4px_rgba(139,92,246,0.12)] transition-all duration-200 animate-slide-up">
                 
                 <div className="space-y-3">
                   <div className="flex justify-between items-start gap-3">
