@@ -75,7 +75,8 @@ export default function Sidebar() {
     {
       groupName: 'OVERVIEW',
       items: [
-        { name: 'Command Center', href: '/dashboard', icon: LayoutDashboard }
+        { name: 'Command Center', href: '/command-center', icon: LayoutDashboard },
+        { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard }
       ]
     },
     {
